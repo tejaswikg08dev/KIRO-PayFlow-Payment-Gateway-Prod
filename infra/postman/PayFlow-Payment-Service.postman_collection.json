@@ -1,0 +1,279 @@
+{
+  "info": {
+    "name": "PayFlow - Payment Service",
+    "_postman_id": "c3d4e5f6-a7b8-9012-cdef-345678901234",
+    "description": "Payment Processing APIs for PayFlow Payment Gateway",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "X-API-Key",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "{{apiKey}}",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Ensure API key is set",
+          "if (!pm.collectionVariables.get('apiKey')) {",
+          "    console.warn('API Key not set. Please run Merchant Service collection first.');",
+          "}",
+          "",
+          "// Generate idempotency key for create operations",
+          "if (pm.request.method === 'POST') {",
+          "    const idempotencyKey = 'idem_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);",
+          "    pm.request.headers.add({ key: 'X-Idempotency-Key', value: idempotencyKey });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "apiKey", "value": "" },
+    { "key": "orderId", "value": "" },
+    { "key": "paymentId", "value": "" },
+    { "key": "refundId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Create Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 150000,\n  \"currency\": \"INR\",\n  \"description\": \"Order for premium subscription\",\n  \"customerEmail\": \"customer@example.com\",\n  \"customerName\": \"John Doe\",\n  \"metadata\": {\n    \"orderId\": \"ORD-2024-001\",\n    \"productName\": \"Premium Plan\"\n  },\n  \"returnUrl\": \"https://teststore.com/payment/success\",\n  \"cancelUrl\": \"https://teststore.com/payment/cancel\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "orders"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function() {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Order created successfully', function() {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('orderId');",
+                  "    pm.expect(body).to.have.property('status', 'CREATED');",
+                  "    pm.expect(body).to.have.property('checkoutUrl');",
+                  "    pm.collectionVariables.set('orderId', body.orderId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Order",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/orders/{{orderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "orders", "{{orderId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Order details returned', function() {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('orderId');",
+                  "    pm.expect(body).to.have.property('amount');",
+                  "    pm.expect(body).to.have.property('status');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Authorize Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"paymentMethod\": {\n    \"type\": \"CARD\",\n    \"card\": {\n      \"number\": \"4111111111111111\",\n      \"expiryMonth\": 12,\n      \"expiryYear\": 2026,\n      \"cvv\": \"123\",\n      \"holderName\": \"John Doe\"\n    }\n  },\n  \"captureMethod\": \"MANUAL\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/authorize",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "authorize"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Payment authorized', function() {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('paymentId');",
+                  "    pm.expect(body).to.have.property('status', 'AUTHORIZED');",
+                  "    pm.collectionVariables.set('paymentId', body.paymentId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Capture Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 150000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}/capture",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "{{paymentId}}", "capture"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Payment captured', function() {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('status', 'CAPTURED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refund Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 50000,\n  \"reason\": \"Customer requested partial refund\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}/refund",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "{{paymentId}}", "refund"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Refund initiated', function() {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('refundId');",
+                  "    pm.expect(body).to.have.property('status');",
+                  "    pm.collectionVariables.set('refundId', body.refundId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Void Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Order cancelled before fulfillment\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}/void",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "payments", "{{paymentId}}", "void"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Payment voided', function() {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('status', 'VOIDED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

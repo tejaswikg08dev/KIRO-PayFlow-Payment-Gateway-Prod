@@ -1,0 +1,25 @@
+server:
+  port: 8086
+
+spring:
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: webhook-consumers
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.payflow.*
+
+webhook:
+  retry:
+    max-attempts: 4
+    intervals-minutes: 5,30,120,1440  # 5min, 30min, 2hr, 24hr
+  delivery:
+    timeout-seconds: 10
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/

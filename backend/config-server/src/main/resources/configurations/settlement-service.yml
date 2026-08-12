@@ -1,0 +1,32 @@
+server:
+  port: 8085
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/payflow_settlement
+    username: payflow
+    password: payflow123
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+  batch:
+    jdbc:
+      initialize-schema: always
+  kafka:
+    bootstrap-servers: localhost:9092
+
+settlement:
+  default-mdr-percent: 2.0
+  default-gst-percent: 18.0
+  schedule:
+    cron: "0 0 0 * * ?"  # Midnight daily
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/

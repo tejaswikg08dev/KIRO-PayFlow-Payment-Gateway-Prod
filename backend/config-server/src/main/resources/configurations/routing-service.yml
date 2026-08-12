@@ -1,0 +1,35 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: routing-service
+
+bank:
+  simulator:
+    host: localhost
+    port: 9090
+    timeout-ms: 5000
+
+routing:
+  epsilon: 0.1  # 10% exploration rate for multi-armed bandit
+
+fraud:
+  velocity-threshold: 5        # max transactions per minute
+  amount-threshold: 50000      # flag transactions above this amount
+  high-risk-score: 70          # auto-decline above this score
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      bankService:
+        register-health-indicator: true
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 5
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/

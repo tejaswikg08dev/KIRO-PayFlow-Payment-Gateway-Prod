@@ -1,0 +1,68 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: webhook-service
+
+  # Kafka
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: webhook-consumers
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.payflow.common.event
+
+  # Config import
+  config:
+    import: "optional:configserver:http://localhost:8888"
+
+# AWS Configuration
+aws:
+  region: ap-south-1
+  dynamodb:
+    endpoint: http://localhost:8000
+
+# Webhook HTTP settings
+webhook:
+  http:
+    connect-timeout: 5000
+    read-timeout: 10000
+
+# Eureka client
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+
+# SpringDoc / Swagger
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+# Logging
+logging:
+  level:
+    com.payflow.webhook: INFO
+    com.payflow.webhook.feign: DEBUG
+    org.springframework.kafka: WARN

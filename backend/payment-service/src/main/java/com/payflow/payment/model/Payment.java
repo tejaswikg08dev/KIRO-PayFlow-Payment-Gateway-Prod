@@ -1,0 +1,65 @@
+package com.payflow.payment.model;
+
+import com.payflow.common.constant.PaymentMethod;
+import com.payflow.common.constant.PaymentStatus;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+
+/**
+ * Represents a payment attempt against an order.
+ * Tracks the full lifecycle: CREATED → AUTHORIZED → CAPTURED/VOIDED/FAILED.
+ */
+@Entity
+@Table(name = "payments")
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class Payment {
+
+    @Id
+    @Column(name = "id", nullable = false, updatable = false, length = 30)
+    private String id;
+
+    @Column(name = "order_id", nullable = false, length = 30)
+    private String orderId;
+
+    @Column(name = "merchant_id", nullable = false, length = 30)
+    private String merchantId;
+
+    @Column(name = "amount", nullable = false, precision = 19, scale = 4)
+    private BigDecimal amount;
+
+    @Column(name = "currency", nullable = false, length = 3)
+    private String currency;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private PaymentStatus status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", nullable = false, length = 20)
+    private PaymentMethod paymentMethod;
+
+    @Column(name = "authorization_code", length = 50)
+    private String authorizationCode;
+
+    @Column(name = "bank_reference_id", length = 100)
+    private String bankReferenceId;
+
+    @Column(name = "failure_reason", length = 500)
+    private String failureReason;
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
+}

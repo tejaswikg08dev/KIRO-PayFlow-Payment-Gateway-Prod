@@ -1,0 +1,354 @@
+{
+  "info": {
+    "name": "PayFlow - Full End-to-End Flow",
+    "_postman_id": "f6a7b8c9-d0e1-2345-f012-678901234567",
+    "description": "Complete end-to-end flow: Register → Onboard → Pay → Settle",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "merchantId", "value": "" },
+    { "key": "apiKey", "value": "" },
+    { "key": "orderId", "value": "" },
+    { "key": "paymentId", "value": "" },
+    { "key": "settlementId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Step 1 - Register Merchant",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"e2e-merchant@payflow.dev\",\n  \"password\": \"E2ETest@123456\",\n  \"firstName\": \"E2E\",\n  \"lastName\": \"Merchant\",\n  \"role\": \"MERCHANT\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/register",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "register"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('User registered', function() {",
+              "    pm.response.to.have.status(201);",
+              "    const body = pm.response.json();",
+              "    pm.expect(body).to.have.property('id');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Step 2 - Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"e2e-merchant@payflow.dev\",\n  \"password\": \"E2ETest@123456\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Login successful', function() {",
+              "    pm.response.to.have.status(200);",
+              "    const body = pm.response.json();",
+              "    pm.collectionVariables.set('accessToken', body.accessToken);",
+              "    pm.collectionVariables.set('refreshToken', body.refreshToken);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Step 3 - Onboard Merchant",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            { "key": "token", "value": "{{accessToken}}", "type": "string" }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"businessName\": \"E2E Test Store\",\n  \"businessType\": \"E_COMMERCE\",\n  \"registrationNumber\": \"E2E-REG-001\",\n  \"country\": \"IN\",\n  \"currency\": \"INR\",\n  \"website\": \"https://e2e-store.example.com\",\n  \"callbackUrl\": \"https://e2e-store.example.com/webhooks\",\n  \"contactEmail\": \"e2e@example.com\",\n  \"contactPhone\": \"+919999999999\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/merchants",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "merchants"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Merchant onboarded', function() {",
+              "    pm.response.to.have.status(201);",
+              "    const body = pm.response.json();",
+              "    pm.collectionVariables.set('merchantId', body.merchantId);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Step 4 - Generate API Key",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            { "key": "token", "value": "{{accessToken}}", "type": "string" }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"E2E Test Key\",\n  \"environment\": \"TEST\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/merchants/{{merchantId}}/api-keys",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "merchants", "{{merchantId}}", "api-keys"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('API Key generated', function() {",
+              "    pm.response.to.have.status(201);",
+              "    const body = pm.response.json();",
+              "    pm.collectionVariables.set('apiKey', body.apiKey);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Step 5 - Create Payment Order",
+      "request": {
+        "auth": {
+          "type": "apikey",
+          "apikey": [
+            { "key": "key", "value": "X-API-Key", "type": "string" },
+            { "key": "value", "value": "{{apiKey}}", "type": "string" },
+            { "key": "in", "value": "header", "type": "string" }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Idempotency-Key", "value": "e2e-test-{{$timestamp}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": 99900,\n  \"currency\": \"INR\",\n  \"description\": \"E2E Test Payment\",\n  \"customerEmail\": \"customer@test.com\",\n  \"customerName\": \"E2E Customer\",\n  \"metadata\": { \"testId\": \"e2e-001\" },\n  \"returnUrl\": \"https://e2e-store.example.com/success\",\n  \"cancelUrl\": \"https://e2e-store.example.com/cancel\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/payments/orders",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "payments", "orders"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Order created', function() {",
+              "    pm.response.to.have.status(201);",
+              "    const body = pm.response.json();",
+              "    pm.collectionVariables.set('orderId', body.orderId);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Step 6 - Authorize Payment",
+      "request": {
+        "auth": {
+          "type": "apikey",
+          "apikey": [
+            { "key": "key", "value": "X-API-Key", "type": "string" },
+            { "key": "value", "value": "{{apiKey}}", "type": "string" },
+            { "key": "in", "value": "header", "type": "string" }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"paymentMethod\": {\n    \"type\": \"CARD\",\n    \"card\": {\n      \"number\": \"4111111111111111\",\n      \"expiryMonth\": 12,\n      \"expiryYear\": 2026,\n      \"cvv\": \"123\",\n      \"holderName\": \"E2E Customer\"\n    }\n  },\n  \"captureMethod\": \"MANUAL\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/payments/authorize",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "payments", "authorize"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Payment authorized', function() {",
+              "    pm.response.to.have.status(200);",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.status).to.equal('AUTHORIZED');",
+              "    pm.collectionVariables.set('paymentId', body.paymentId);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Step 7 - Capture Payment",
+      "request": {
+        "auth": {
+          "type": "apikey",
+          "apikey": [
+            { "key": "key", "value": "X-API-Key", "type": "string" },
+            { "key": "value", "value": "{{apiKey}}", "type": "string" },
+            { "key": "in", "value": "header", "type": "string" }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": 99900\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}/capture",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "payments", "{{paymentId}}", "capture"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Payment captured', function() {",
+              "    pm.response.to.have.status(200);",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.status).to.equal('CAPTURED');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Step 8 - Trigger Settlement",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            { "key": "token", "value": "{{accessToken}}", "type": "string" }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"merchantId\": \"{{merchantId}}\",\n  \"fromDate\": \"2024-01-01\",\n  \"toDate\": \"2024-12-31\",\n  \"currency\": \"INR\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/settlements/trigger",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "settlements", "trigger"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Settlement triggered', function() {",
+              "    pm.response.to.have.status(202);",
+              "    const body = pm.response.json();",
+              "    pm.collectionVariables.set('settlementId', body.settlementId);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Step 9 - Verify Settlement",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            { "key": "token", "value": "{{accessToken}}", "type": "string" }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/settlements/{{settlementId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "settlements", "{{settlementId}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Settlement completed', function() {",
+              "    pm.response.to.have.status(200);",
+              "    const body = pm.response.json();",
+              "    pm.expect(body).to.have.property('status');",
+              "});",
+              "",
+              "console.log('=== E2E Flow Complete! ===');"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

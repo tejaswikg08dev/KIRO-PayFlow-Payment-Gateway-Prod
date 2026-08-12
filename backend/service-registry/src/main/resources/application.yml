@@ -1,0 +1,18 @@
+server:
+  port: 8761
+
+spring:
+  application:
+    name: service-registry
+
+eureka:
+  instance:
+    hostname: localhost
+  client:
+    register-with-eureka: false    # This IS the registry — don't register with itself
+    fetch-registry: false          # No need to fetch from itself
+    service-url:
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+  server:
+    enable-self-preservation: false  # Disable in dev (enable in prod)
+    eviction-interval-timer-in-ms: 5000

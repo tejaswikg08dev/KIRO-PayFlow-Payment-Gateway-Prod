@@ -1,0 +1,9 @@
+bank:
+  simulator:
+    host: bank-simulator
+    port: 9090
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://service-registry:8761/eureka/

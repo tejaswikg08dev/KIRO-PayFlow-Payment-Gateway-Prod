@@ -1,0 +1,75 @@
+server:
+  port: 8087
+
+spring:
+  application:
+    name: notification-service
+
+  # Kafka
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: notification-consumers
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.payflow.common.event
+
+  # Thymeleaf templates
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+    mode: HTML
+    cache: true
+
+  # Config import
+  config:
+    import: "optional:configserver:http://localhost:8888"
+
+# AWS Configuration
+aws:
+  region: ap-south-1
+  ses:
+    endpoint: https://email.ap-south-1.amazonaws.com
+  sns:
+    endpoint: https://sns.ap-south-1.amazonaws.com
+
+# Notification settings
+notification:
+  email:
+    from: noreply@payflow.com
+
+# Eureka client
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+
+# SpringDoc / Swagger
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+# Logging
+logging:
+  level:
+    com.payflow.notification: INFO
+    org.springframework.kafka: WARN

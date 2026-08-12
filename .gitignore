@@ -1,0 +1,62 @@
+# # ═══════════════════════════════════════════════════════════════
+# # PayFlow Payment Gateway — .gitignore
+# # ═══════════════════════════════════════════════════════════════
+
+# # ─── Java / Maven ─────────────────────────────────────────────
+# target/
+# !.mvn/wrapper/maven-wrapper.jar
+# !**/src/main/**/target/
+# !**/src/test/**/target/
+
+# # ─── IDE (IntelliJ IDEA) ─────────────────────────────────────
+# .idea/
+# *.iws
+# *.iml
+# *.ipr
+# out/
+# *.class
+
+# # ─── IDE (VS Code) ───────────────────────────────────────────
+# .vscode/
+# *.code-workspace
+
+# # ─── IDE (Eclipse) ───────────────────────────────────────────
+# .classpath
+# .project
+# .settings/
+# bin/
+
+# # ─── Node.js / Frontend ─────────────────────────────────────
+# node_modules/
+# dist/
+# build/
+# .env
+# .env.local
+# .env.*.local
+# *.tsbuildinfo
+
+# # ─── Docker ──────────────────────────────────────────────────
+# infra/docker/.env
+
+# # ─── OS Files ────────────────────────────────────────────────
+# .DS_Store
+# Thumbs.db
+# ehthumbs.db
+# Desktop.ini
+
+# # ─── Logs ────────────────────────────────────────────────────
+# *.log
+# logs/
+
+# # ─── Secrets / Credentials ───────────────────────────────────
+# *.pem
+# *.key
+# *.p12
+# *.jks
+# credentials.json
+# *-credentials.json
+
+# # ─── Coverage Reports ────────────────────────────────────────
+# coverage/
+# *.lcov
+# jacoco.exec

@@ -1,0 +1,310 @@
+version: '3.8'
+
+# Production Docker Compose - Services Only
+# Infrastructure is managed externally (AWS RDS, ElastiCache, MSK)
+
+services:
+  service-registry:
+    image: ${DOCKER_REGISTRY}/payflow-service-registry:${IMAGE_TAG:-latest}
+    container_name: payflow-service-registry
+    ports:
+      - "8761:8761"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+    networks:
+      - backend-net
+
+  config-server:
+    image: ${DOCKER_REGISTRY}/payflow-config-server:${IMAGE_TAG:-latest}
+    container_name: payflow-config-server
+    ports:
+      - "8888:8888"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_URI=${CONFIG_GIT_URI}
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_USERNAME=${CONFIG_GIT_USERNAME}
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_PASSWORD=${CONFIG_GIT_PASSWORD}
+    depends_on:
+      service-registry:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+    networks:
+      - backend-net
+
+  api-gateway:
+    image: ${DOCKER_REGISTRY}/payflow-api-gateway:${IMAGE_TAG:-latest}
+    container_name: payflow-api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+      - SPRING_REDIS_HOST=${ELASTICACHE_ENDPOINT}
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      service-registry:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+    networks:
+      - backend-net
+      - frontend-net
+
+  identity-service:
+    image: ${DOCKER_REGISTRY}/payflow-identity-service:${IMAGE_TAG:-latest}
+    container_name: payflow-identity-service
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://${RDS_ENDPOINT}:5432/payflow_identity
+      - SPRING_DATASOURCE_USERNAME=${RDS_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${RDS_PASSWORD}
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      service-registry:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+    networks:
+      - backend-net
+
+  merchant-service:
+    image: ${DOCKER_REGISTRY}/payflow-merchant-service:${IMAGE_TAG:-latest}
+    container_name: payflow-merchant-service
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://${RDS_ENDPOINT}:5432/payflow_merchant
+      - SPRING_DATASOURCE_USERNAME=${RDS_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${RDS_PASSWORD}
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+    depends_on:
+      service-registry:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+    networks:
+      - backend-net
+
+  payment-service:
+    image: ${DOCKER_REGISTRY}/payflow-payment-service:${IMAGE_TAG:-latest}
+    container_name: payflow-payment-service
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://${RDS_ENDPOINT}:5432/payflow_payment
+      - SPRING_DATASOURCE_USERNAME=${RDS_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${RDS_PASSWORD}
+      - SPRING_REDIS_HOST=${ELASTICACHE_ENDPOINT}
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=${MSK_BROKERS}
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+    depends_on:
+      service-registry:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+    networks:
+      - backend-net
+
+  routing-service:
+    image: ${DOCKER_REGISTRY}/payflow-routing-service:${IMAGE_TAG:-latest}
+    container_name: payflow-routing-service
+    ports:
+      - "8084:8084"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+      - AWS_REGION=${AWS_REGION}
+    depends_on:
+      service-registry:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+    networks:
+      - backend-net
+
+  settlement-service:
+    image: ${DOCKER_REGISTRY}/payflow-settlement-service:${IMAGE_TAG:-latest}
+    container_name: payflow-settlement-service
+    ports:
+      - "8085:8085"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://${RDS_ENDPOINT}:5432/payflow_settlement
+      - SPRING_DATASOURCE_USERNAME=${RDS_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${RDS_PASSWORD}
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=${MSK_BROKERS}
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+    depends_on:
+      service-registry:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+    networks:
+      - backend-net
+
+  webhook-service:
+    image: ${DOCKER_REGISTRY}/payflow-webhook-service:${IMAGE_TAG:-latest}
+    container_name: payflow-webhook-service
+    ports:
+      - "8086:8086"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=${MSK_BROKERS}
+      - AWS_REGION=${AWS_REGION}
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+    depends_on:
+      service-registry:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+    networks:
+      - backend-net
+
+  notification-service:
+    image: ${DOCKER_REGISTRY}/payflow-notification-service:${IMAGE_TAG:-latest}
+    container_name: payflow-notification-service
+    ports:
+      - "8087:8087"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=${MSK_BROKERS}
+      - AWS_REGION=${AWS_REGION}
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+    depends_on:
+      service-registry:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8087/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+    networks:
+      - backend-net
+
+  merchant-portal:
+    image: ${DOCKER_REGISTRY}/payflow-merchant-portal:${IMAGE_TAG:-latest}
+    container_name: payflow-merchant-portal
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=${API_GATEWAY_URL}
+    networks:
+      - frontend-net
+
+  hosted-checkout:
+    image: ${DOCKER_REGISTRY}/payflow-hosted-checkout:${IMAGE_TAG:-latest}
+    container_name: payflow-hosted-checkout
+    ports:
+      - "3001:3001"
+    environment:
+      - NEXT_PUBLIC_API_URL=${API_GATEWAY_URL}
+    networks:
+      - frontend-net
+
+networks:
+  frontend-net:
+    driver: bridge
+  backend-net:
+    driver: bridge

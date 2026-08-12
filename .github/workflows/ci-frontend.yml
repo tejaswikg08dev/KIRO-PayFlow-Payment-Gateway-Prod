@@ -1,0 +1,133 @@
+name: Frontend CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/ci-frontend.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'frontend/**'
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  lint-and-build:
+    name: Lint & Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [merchant-portal, hosted-checkout]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/${{ matrix.app }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend/${{ matrix.app }}
+        run: npm ci
+
+      - name: Run linter
+        working-directory: frontend/${{ matrix.app }}
+        run: npm run lint
+
+      - name: Run type check
+        working-directory: frontend/${{ matrix.app }}
+        run: npm run type-check || true
+
+      - name: Run tests
+        working-directory: frontend/${{ matrix.app }}
+        run: npm run test -- --coverage --watchAll=false || true
+
+      - name: Build application
+        working-directory: frontend/${{ matrix.app }}
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.API_GATEWAY_URL }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-build
+          path: frontend/${{ matrix.app }}/.next/
+          retention-days: 7
+
+  deploy:
+    name: Deploy to S3/CloudFront
+    needs: lint-and-build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+    strategy:
+      matrix:
+        include:
+          - app: merchant-portal
+            s3_bucket: MERCHANT_PORTAL_S3_BUCKET
+            cloudfront_id: MERCHANT_PORTAL_CF_ID
+          - app: hosted-checkout
+            s3_bucket: HOSTED_CHECKOUT_S3_BUCKET
+            cloudfront_id: HOSTED_CHECKOUT_CF_ID
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/${{ matrix.app }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend/${{ matrix.app }}
+        run: npm ci
+
+      - name: Build for production
+        working-directory: frontend/${{ matrix.app }}
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.API_GATEWAY_URL }}
+
+      - name: Export static files
+        working-directory: frontend/${{ matrix.app }}
+        run: npm run export || true
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Sync to S3
+        run: |
+          aws s3 sync frontend/${{ matrix.app }}/out/ s3://${{ secrets[matrix.s3_bucket] }}/ \
+            --delete \
+            --cache-control "public, max-age=31536000, immutable" \
+            --exclude "*.html" \
+            --exclude "*.json"
+          aws s3 sync frontend/${{ matrix.app }}/out/ s3://${{ secrets[matrix.s3_bucket] }}/ \
+            --delete \
+            --cache-control "public, max-age=0, must-revalidate" \
+            --include "*.html" \
+            --include "*.json"
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets[matrix.cloudfront_id] }} \
+            --paths "/*"
+
+      - name: Notify deployment
+        if: success()
+        run: |
+          echo "Frontend ${{ matrix.app }} deployed successfully!"

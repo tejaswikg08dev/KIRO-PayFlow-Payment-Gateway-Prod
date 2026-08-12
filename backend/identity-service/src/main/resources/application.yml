@@ -1,0 +1,29 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: identity-service
+  config:
+    import: optional:configserver:http://localhost:8888
+  datasource:
+    url: jdbc:postgresql://localhost:5432/payflow_identity
+    username: payflow
+    password: payflow123
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+jwt:
+  secret: payflow-jwt-secret-key-must-be-at-least-256-bits-long-for-hmac-sha256
+  access-token-expiration: 900000
+  refresh-token-expiration: 604800000
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/

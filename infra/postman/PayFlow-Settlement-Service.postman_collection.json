@@ -1,0 +1,177 @@
+{
+  "info": {
+    "name": "PayFlow - Settlement Service",
+    "_postman_id": "d4e5f6a7-b8c9-0123-def0-456789012345",
+    "description": "Settlement APIs for PayFlow Payment Gateway",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-login if no token",
+          "if (!pm.collectionVariables.get('accessToken')) {",
+          "    pm.sendRequest({",
+          "        url: pm.environment.get('baseUrl') + '/api/v1/auth/login',",
+          "        method: 'POST',",
+          "        header: { 'Content-Type': 'application/json' },",
+          "        body: { mode: 'raw', raw: JSON.stringify({ email: 'admin@payflow.dev', password: 'Admin@123456' }) }",
+          "    }, function(err, res) {",
+          "        if (!err && res.code === 200) {",
+          "            const body = res.json();",
+          "            pm.collectionVariables.set('accessToken', body.accessToken);",
+          "        }",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "accessToken", "value": "" },
+    { "key": "settlementId", "value": "" },
+    { "key": "merchantId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Trigger Settlement",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"merchantId\": \"{{merchantId}}\",\n  \"fromDate\": \"2024-01-01\",\n  \"toDate\": \"2024-01-31\",\n  \"currency\": \"INR\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/settlements/trigger",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "settlements", "trigger"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 202', function() {",
+              "    pm.response.to.have.status(202);",
+              "});",
+              "",
+              "pm.test('Settlement triggered', function() {",
+              "    const body = pm.response.json();",
+              "    pm.expect(body).to.have.property('settlementId');",
+              "    pm.expect(body).to.have.property('status', 'INITIATED');",
+              "    pm.collectionVariables.set('settlementId', body.settlementId);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List Settlements",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/settlements?merchantId={{merchantId}}&page=0&size=10",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "settlements"],
+          "query": [
+            { "key": "merchantId", "value": "{{merchantId}}" },
+            { "key": "page", "value": "0" },
+            { "key": "size", "value": "10" }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function() {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Returns paginated list', function() {",
+              "    const body = pm.response.json();",
+              "    pm.expect(body).to.have.property('content');",
+              "    pm.expect(body).to.have.property('totalElements');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Settlement",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/settlements/{{settlementId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "settlements", "{{settlementId}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function() {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Settlement details returned', function() {",
+              "    const body = pm.response.json();",
+              "    pm.expect(body).to.have.property('settlementId');",
+              "    pm.expect(body).to.have.property('totalAmount');",
+              "    pm.expect(body).to.have.property('status');",
+              "    pm.expect(body).to.have.property('transactions');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Settlement Report",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/settlements/{{settlementId}}/report",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "settlements", "{{settlementId}}", "report"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function() {",
+              "    pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

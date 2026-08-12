@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Settlement Completed</title>
+</head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background-color: #9C27B0; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+        <h1 style="margin: 0;">Settlement Completed &#9989;</h1>
+    </div>
+    <div style="border: 1px solid #e0e0e0; padding: 20px; border-radius: 0 0 8px 8px;">
+        <p>Dear Merchant,</p>
+        <p>Your daily settlement has been processed and the payout has been initiated.</p>
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+            <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Settlement Date:</strong></td>
+                <td style="padding: 8px; border-bottom: 1px solid #eee;" th:text="${settlementDate}">2024-01-01</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Gross Amount:</strong></td>
+                <td style="padding: 8px; border-bottom: 1px solid #eee;">
+                    <span th:text="${currency}">INR</span> <span th:text="${grossAmount}">0.00</span>
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>MDR + GST:</strong></td>
+                <td style="padding: 8px; border-bottom: 1px solid #eee;">
+                    <span th:text="${currency}">INR</span> <span th:text="${deductions}">0.00</span>
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>Net Payout:</strong></td>
+                <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold; color: #4CAF50;">
+                    <span th:text="${currency}">INR</span> <span th:text="${netAmount}">0.00</span>
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 8px;"><strong>Transaction Count:</strong></td>
+                <td style="padding: 8px;" th:text="${transactionCount}">0</td>
+            </tr>
+        </table>
+        <p>The payout will be credited to your registered bank account within 1-2 business days.</p>
+        <p style="color: #666; font-size: 12px;">This is an automated notification from PayFlow. Please do not reply to this email.</p>
+    </div>
+</body>
+</html>

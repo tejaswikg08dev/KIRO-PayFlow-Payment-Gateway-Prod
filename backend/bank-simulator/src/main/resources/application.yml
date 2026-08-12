@@ -1,0 +1,31 @@
+server:
+  port: 9000
+
+spring:
+  application:
+    name: bank-simulator
+
+# Bank Simulator Configuration
+simulator:
+  tcp-port: 9090
+  success-rate-percent: 85
+  min-latency-ms: 50
+  max-latency-ms: 500
+  log-full-messages: false
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+# Logging
+logging:
+  level:
+    com.payflow.bank: INFO
+    com.payflow.bank.server: DEBUG
+    io.netty: WARN

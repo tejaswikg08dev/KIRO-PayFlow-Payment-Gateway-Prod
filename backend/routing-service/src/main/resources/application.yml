@@ -1,0 +1,110 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: routing-service
+  profiles:
+    active: dev
+  config:
+    import: optional:configserver:http://localhost:8888
+
+# Bank Simulator Connection
+bank:
+  simulator:
+    host: localhost
+    port: 9090
+    connect-timeout-ms: 5000
+    response-timeout-seconds: 30
+
+# Smart Routing Configuration
+routing:
+  epsilon: 0.10  # 10% exploration rate
+
+# Fraud Detection Thresholds
+fraud:
+  rules:
+    velocity-threshold: 5        # Max transactions per minute
+    amount-threshold: 50000      # Amount threshold in base currency
+    velocity-window-ms: 60000    # 1 minute window
+  weight:
+    rules: 0.6                   # 60% weight for rule engine
+    model: 0.4                   # 40% weight for ML model
+
+# Netty Configuration
+netty:
+  worker-threads: 4
+  connection-pool:
+    max-connections: 10
+    max-idle-time-seconds: 60
+
+# AWS DynamoDB Configuration
+aws:
+  dynamodb:
+    endpoint: http://localhost:4566  # LocalStack endpoint
+  region: us-east-1
+  access-key: localstack
+  secret-key: localstack
+
+# Resilience4j Circuit Breaker
+resilience4j:
+  circuitbreaker:
+    failure-rate-threshold: 50
+    slow-call-rate-threshold: 80
+    slow-call-duration-threshold-seconds: 5
+    sliding-window-size: 10
+    minimum-number-of-calls: 5
+    wait-duration-in-open-state-seconds: 30
+    permitted-calls-in-half-open: 3
+    instances:
+      bankCommunication:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+        slidingWindowType: COUNT_BASED
+        minimumNumberOfCalls: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        slowCallDurationThreshold: 5s
+        slowCallRateThreshold: 80
+
+# Eureka Client
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,circuitbreakers,circuitbreakerevents
+  endpoint:
+    health:
+      show-details: always
+  health:
+    circuitbreakers:
+      enabled: true
+
+# Logging
+logging:
+  level:
+    com.payflow.routing: DEBUG
+    io.netty: INFO
+    io.github.resilience4j: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+# SpringDoc OpenAPI
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
