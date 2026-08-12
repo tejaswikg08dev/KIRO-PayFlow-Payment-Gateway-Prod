@@ -1,223 +1,331 @@
-# Phase 7 Part 2: Backend CI/CD Pipeline
+# Phase 7 · Part 2 — Backend CI/CD Pipeline
 
-## Overview
+| Field | Value |
+|-------|-------|
+| **Project** | PayFlow Payment Gateway |
+| **Phase** | 7 — CI/CD Pipeline |
+| **Part** | 2 — Backend Pipeline (Build, Docker, Deploy) |
+| **Previous** | [Part 1 — CI/CD Concepts](phase7-part1-cicd-concepts.md) |
+| **Next** | [Part 3 — Frontend Pipeline](phase7-part3-frontend-pipeline.md) |
+| **Time** | ~2.5 hours |
+| **Difficulty** | ★★★☆☆ Intermediate |
+| **Prerequisites** | GitHub Actions basics, Docker, AWS ECR/EC2 |
 
-Complete GitHub Actions workflow for backend services: build, test, Docker image creation, ECR push, and EC2 deployment.
+---
 
-## Full Backend Workflow
+## Table of Contents
+
+1. [Pipeline Overview](#1-pipeline-overview)
+2. [Trigger Configuration](#2-trigger-configuration)
+3. [Build Job](#3-build-job)
+4. [Docker Job](#4-docker-job)
+5. [Deploy Job](#5-deploy-job)
+6. [GitHub Secrets Setup](#6-github-secrets-setup)
+7. [What You Learned](#what-you-learned)
+8. [Common Errors & Fixes](#common-errors--fixes)
+
+---
+
+## 1. Pipeline Overview
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    ci-backend.yml Pipeline                         │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  TRIGGER: push to main (backend/** changed)                       │
+│                                                                    │
+│  ┌──────────┐      ┌──────────┐      ┌──────────┐               │
+│  │  BUILD   │ ───► │  DOCKER  │ ───► │  DEPLOY  │               │
+│  │          │      │          │      │          │               │
+│  │ Checkout │      │ Build img│      │ SSH EC2  │               │
+│  │ Java 17  │      │ Push ECR │      │ Pull img │               │
+│  │ mvn verify      │ (per svc)│      │ Compose  │               │
+│  │ Coverage │      │          │      │ Health ✓ │               │
+│  └──────────┘      └──────────┘      └──────────┘               │
+│                                                                    │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 2. Trigger Configuration
 
 ```yaml
 # .github/workflows/ci-backend.yml
-name: Backend CI/CD Pipeline
+name: CI Backend
 
 on:
   push:
-    branches: [main, develop]
-    paths: ['backend/**']
+    branches: [main]
+    paths:
+      - 'backend/**'           # Only when backend code changes
+      - 'docker-compose*.yml'  # Or compose files change
+      - '!backend/**/*.md'     # Ignore markdown changes
   pull_request:
     branches: [main]
-    paths: ['backend/**']
+    paths:
+      - 'backend/**'
 
 env:
   AWS_REGION: ap-south-1
-  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com
+  ECR_REGISTRY: 123456789012.dkr.ecr.ap-south-1.amazonaws.com
   JAVA_VERSION: '17'
+```
 
+**Why path filtering?** PayFlow has frontend + backend. We don't want to rebuild all 11 Java services when only a CSS file changes.
+
+---
+
+## 3. Build Job
+
+The build job compiles all backend services and runs tests.
+
+```yaml
 jobs:
-  # ═══════════════════════════════════
-  # Job 1: Build and Unit Test
-  # ═══════════════════════════════════
-  build-and-test:
+  build:
+    name: Build & Test
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service: [identity-service, merchant-service, payment-service, routing-service, settlement-service, webhook-service, notification-service, bank-simulator, api-gateway]
+    
     steps:
-      - uses: actions/checkout@v4
+      # ─── Step 1: Check out repository ──────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Set up Java ${{ env.JAVA_VERSION }}
+      # ─── Step 2: Set up Java 17 ────────────────────
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: ${{ env.JAVA_VERSION }}
-          distribution: 'corretto'
-          cache: 'maven'
+          distribution: 'temurin'
+          cache: 'maven'           # Cache ~/.m2 for faster builds
 
-      - name: Build and Test ${{ matrix.service }}
-        working-directory: backend
-        run: mvn clean test -pl ${{ matrix.service }} -am -B
+      # ─── Step 3: Build and test all services ────────
+      - name: Build with Maven
+        working-directory: ./backend
+        run: |
+          mvn clean verify -B \
+            -Dspring.profiles.active=test \
+            -Djacoco.skip=false
+        # -B = batch mode (no interactive prompts)
+        # verify = compile + test + integration-test + check coverage
 
-      - name: Upload Test Results
-        if: always()
+      # ─── Step 4: Upload test reports ────────────────
+      - name: Upload test reports
+        if: always()               # Upload even if tests fail
         uses: actions/upload-artifact@v4
         with:
-          name: test-results-${{ matrix.service }}
-          path: backend/${{ matrix.service }}/target/surefire-reports/
+          name: test-reports
+          path: backend/**/target/surefire-reports/
 
-  # ═══════════════════════════════════
-  # Job 2: Integration Tests
-  # ═══════════════════════════════════
-  integration-tests:
-    runs-on: ubuntu-latest
-    needs: build-and-test
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_DB: payflow_test
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-        ports: ['5432:5432']
-        options: --health-cmd pg_isready --health-interval 10s
-      redis:
-        image: redis:7-alpine
-        ports: ['6379:6379']
-        options: --health-cmd "redis-cli ping" --health-interval 10s
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      # ─── Step 5: Upload coverage report ─────────────
+      - name: Upload JaCoCo coverage
+        uses: actions/upload-artifact@v4
         with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: 'corretto'
-          cache: 'maven'
+          name: coverage-report
+          path: backend/**/target/site/jacoco/
 
-      - name: Run Integration Tests
-        working-directory: backend
-        run: mvn verify -Pintegration -pl payment-service -am -B
-        env:
-          DB_HOST: localhost
-          DB_PORT: 5432
-          REDIS_HOST: localhost
+      # ─── Step 6: Comment coverage on PR ─────────────
+      - name: Add coverage to PR
+        if: github.event_name == 'pull_request'
+        uses: madrapps/jacoco-report@v1.6
+        with:
+          paths: backend/**/target/site/jacoco/jacoco.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
+          min-coverage-overall: 80
+```
 
-  # ═══════════════════════════════════
-  # Job 3: Docker Build and Push
-  # ═══════════════════════════════════
-  docker-build-push:
+---
+
+## 4. Docker Job
+
+After build passes, build Docker images and push to AWS ECR.
+
+```yaml
+  docker:
+    name: Build & Push Docker Images
     runs-on: ubuntu-latest
-    needs: integration-tests
+    needs: build                    # Only runs after build succeeds
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
     strategy:
       matrix:
-        service: [api-gateway, identity-service, merchant-service, payment-service, routing-service, bank-simulator, settlement-service, webhook-service, notification-service]
-    steps:
-      - uses: actions/checkout@v4
+        service:
+          - api-gateway
+          - identity-service
+          - merchant-service
+          - payment-service
+          - routing-engine
+          - bank-simulator
+          - settlement-service
+          - notification-service
+          - webhook-service
+          - analytics-service
+          - reconciliation-service
 
-      - name: Configure AWS Credentials
+    steps:
+      # ─── Step 1: Checkout ──────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ─── Step 2: Configure AWS credentials ─────────
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to ECR
+      # ─── Step 3: Login to ECR ──────────────────────
+      - name: Login to Amazon ECR
+        id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Set up Java and Build JAR
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'corretto'
-          cache: 'maven'
-
-      - name: Build JAR
-        working-directory: backend
-        run: mvn package -pl ${{ matrix.service }} -am -DskipTests -B
-
-      - name: Build and Push Docker Image
-        working-directory: backend/${{ matrix.service }}
+      # ─── Step 4: Build and push image ──────────────
+      - name: Build and push Docker image
+        env:
+          IMAGE_TAG: ${{ github.sha }}
         run: |
-          IMAGE_TAG=${{ github.sha }}
-          docker build -t $ECR_REGISTRY/payflow/${{ matrix.service }}:$IMAGE_TAG .
-          docker tag $ECR_REGISTRY/payflow/${{ matrix.service }}:$IMAGE_TAG \
-                     $ECR_REGISTRY/payflow/${{ matrix.service }}:latest
-          docker push $ECR_REGISTRY/payflow/${{ matrix.service }}:$IMAGE_TAG
-          docker push $ECR_REGISTRY/payflow/${{ matrix.service }}:latest
+          cd backend/${{ matrix.service }}
+          
+          # Build the image
+          docker build -t ${{ env.ECR_REGISTRY }}/payflow-${{ matrix.service }}:$IMAGE_TAG .
+          docker tag ${{ env.ECR_REGISTRY }}/payflow-${{ matrix.service }}:$IMAGE_TAG \
+                     ${{ env.ECR_REGISTRY }}/payflow-${{ matrix.service }}:latest
+          
+          # Push both tags
+          docker push ${{ env.ECR_REGISTRY }}/payflow-${{ matrix.service }}:$IMAGE_TAG
+          docker push ${{ env.ECR_REGISTRY }}/payflow-${{ matrix.service }}:latest
+          
+          echo "✅ Pushed payflow-${{ matrix.service }}:$IMAGE_TAG"
+```
 
-  # ═══════════════════════════════════
-  # Job 4: Deploy to EC2
-  # ═══════════════════════════════════
+**Why matrix strategy?** Builds all 11 services in parallel — much faster than sequential.
+
+---
+
+## 5. Deploy Job
+
+After images are pushed, deploy to EC2 via SSH.
+
+```yaml
   deploy:
+    name: Deploy to EC2
     runs-on: ubuntu-latest
-    needs: docker-build-push
-    environment: production
+    needs: docker
+    if: github.ref == 'refs/heads/main'
+    environment: production         # Requires manual approval (optional)
+
     steps:
-      - name: Deploy to EC2
+      # ─── Step 1: SSH and deploy ────────────────────
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            # Navigate to project directory
+            cd /opt/payflow
+            
             # Login to ECR
             aws ecr get-login-password --region ap-south-1 | \
-              docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
-
+              docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+            
             # Pull latest images
-            docker pull ${{ env.ECR_REGISTRY }}/payflow/api-gateway:latest
-            docker pull ${{ env.ECR_REGISTRY }}/payflow/payment-service:latest
-            docker pull ${{ env.ECR_REGISTRY }}/payflow/identity-service:latest
+            docker compose pull
+            
+            # Restart services with zero downtime (rolling)
+            docker compose up -d --remove-orphans
+            
+            # Wait for health checks
+            sleep 30
+            
+            # Verify all services are healthy
+            docker compose ps --format json | jq -e 'all(.Health == "healthy")'
+            
+            echo "✅ Deployment complete!"
 
-            # Restart services with new images
-            cd /home/ec2-user/payflow
-            docker compose down
-            docker compose up -d
-
-            # Verify health
-            sleep 15
-            curl -f http://localhost:8080/actuator/health || exit 1
-            echo "✅ Deployment successful"
-
-      - name: Health Check
+      # ─── Step 2: Verify deployment ─────────────────
+      - name: Health check
         run: |
-          sleep 30
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.EC2_HOST }}:8080/actuator/health)
-          if [ "$HTTP_STATUS" != "200" ]; then
-            echo "❌ Health check failed with status $HTTP_STATUS"
-            exit 1
-          fi
-          echo "✅ All services healthy"
+          # Wait for services to stabilize
+          sleep 10
+          
+          # Check API Gateway health
+          curl -f http://${{ secrets.EC2_HOST }}:8080/actuator/health || exit 1
+          
+          echo "✅ Health check passed"
+
+      # ─── Step 3: Notify on failure ─────────────────
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Deployment failed! Check logs."
+          # Could send Slack/email notification here
 ```
 
-## Pipeline Duration Targets
+---
 
-| Stage | Target | Actual |
-|-------|--------|--------|
-| Build + Unit Tests | < 3 min | ~2 min |
-| Integration Tests | < 5 min | ~3 min |
-| Docker Build + Push | < 5 min | ~4 min |
-| Deploy + Health Check | < 3 min | ~2 min |
-| **Total Pipeline** | **< 15 min** | **~11 min** |
+## 6. GitHub Secrets Setup
 
-## Caching Strategy
+Navigate to: **Repository → Settings → Secrets and variables → Actions**
 
-```yaml
-# Maven dependency caching
-- uses: actions/cache@v4
-  with:
-    path: ~/.m2/repository
-    key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-    restore-keys: ${{ runner.os }}-maven-
+| Secret Name | Value | Purpose |
+|-------------|-------|---------|
+| `AWS_ACCESS_KEY_ID` | `AKIA...` | AWS programmatic access |
+| `AWS_SECRET_ACCESS_KEY` | `wJal...` | AWS secret key |
+| `ECR_REGISTRY` | `123456789012.dkr.ecr.ap-south-1.amazonaws.com` | ECR URL |
+| `EC2_HOST` | `13.235.xx.xx` | EC2 public IP |
+| `EC2_SSH_KEY` | `-----BEGIN RSA...` | PEM file contents |
 
-# Docker layer caching
-- uses: docker/build-push-action@v5
-  with:
-    cache-from: type=gha
-    cache-to: type=gha,mode=max
+### How to Add a Secret
+
+```bash
+# 1. Go to GitHub repo → Settings → Secrets → Actions
+# 2. Click "New repository secret"
+# 3. Name: AWS_ACCESS_KEY_ID
+# 4. Value: paste the key
+# 5. Click "Add secret"
+
+# For SSH key, paste the ENTIRE .pem file content including:
+# -----BEGIN RSA PRIVATE KEY-----
+# ... (key content) ...
+# -----END RSA PRIVATE KEY-----
 ```
 
-## Failure Handling
+---
 
-```yaml
-# Rollback on deployment failure
-- name: Rollback on Failure
-  if: failure()
-  uses: appleboy/ssh-action@v1
-  with:
-    host: ${{ secrets.EC2_HOST }}
-    username: ec2-user
-    key: ${{ secrets.EC2_SSH_KEY }}
-    script: |
-      docker compose down
-      docker tag payflow/payment-service:previous payflow/payment-service:latest
-      docker compose up -d
-      echo "🔄 Rolled back to previous version"
-```
+## What You Learned
+
+| # | Topic | Key Takeaway |
+|---|-------|-------------|
+| 1 | Pipeline structure | Build → Docker → Deploy (sequential jobs) |
+| 2 | Path filtering | Only trigger when relevant files change |
+| 3 | Maven in CI | `mvn clean verify` builds, tests, and checks coverage |
+| 4 | Matrix strategy | Parallel Docker builds for all 11 services |
+| 5 | ECR push | Tag with git SHA + latest for traceability |
+| 6 | SSH deploy | Pull images on EC2, docker compose up |
+| 7 | Secrets | Store credentials securely in GitHub Secrets |
+
+---
+
+## Common Errors & Fixes
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `mvn: command not found` | Java not set up | Add `actions/setup-java@v4` step before build |
+| Tests pass locally but fail in CI | Different env (timezone, locale) | Use `SPRING_PROFILES_ACTIVE=test` |
+| Docker push: `no basic auth` | ECR login expired or not configured | Add `aws-actions/amazon-ecr-login@v2` step |
+| SSH connection refused | Security group doesn't allow SSH from GitHub | Add GitHub Actions IP ranges to SG |
+| Matrix job timeout | One service takes too long to build | Add `timeout-minutes: 15` per job |
+| `docker compose` not found on EC2 | Old Docker version | Install Docker Compose V2 plugin on EC2 |
+| Health check fails after deploy | Service still starting | Increase sleep time or add retry loop |
+
+---
+
+<div align="center">
+
+**[← Part 1: CI/CD Concepts](phase7-part1-cicd-concepts.md)** | **[Documentation Index](../README.md)** | **[Part 3: Frontend Pipeline →](phase7-part3-frontend-pipeline.md)**
+
+</div>

@@ -1,182 +1,319 @@
-# Phase 8 Part 3: Database & Messaging Setup
+# Phase 8 · Part 3 — Database & Messaging Setup
 
-## Overview
+| Field | Value |
+|-------|-------|
+| **Project** | PayFlow Payment Gateway |
+| **Phase** | 8 — AWS Deployment |
+| **Part** | 3 — RDS, DynamoDB, SQS, SNS |
+| **Previous** | [Part 2 — Networking & VPC](phase8-part2-networking-vpc.md) |
+| **Next** | [Part 4 — Compute & Registry](phase8-part4-compute-registry.md) |
+| **Time** | ~1.5 hours |
+| **Difficulty** | ★★★☆☆ Intermediate |
+| **Prerequisites** | VPC and Security Groups from Part 2 |
 
-Setting up RDS PostgreSQL, DynamoDB, and messaging (Kafka on EC2 or SQS as alternative) on AWS.
+---
 
-## RDS PostgreSQL Setup
+## Table of Contents
+
+1. [Create RDS PostgreSQL](#1-create-rds-postgresql)
+2. [Configure Security Group for RDS](#2-configure-security-group-for-rds)
+3. [Save Endpoint URL](#3-save-endpoint-url)
+4. [Create DynamoDB Tables](#4-create-dynamodb-tables)
+5. [Create SQS Queues](#5-create-sqs-queues)
+6. [Create SNS Topics](#6-create-sns-topics)
+7. [What You Learned](#what-you-learned)
+8. [Common Errors & Fixes](#common-errors--fixes)
+
+---
+
+## 1. Create RDS PostgreSQL
+
+### Using AWS Console
+
+1. **Console** → Search "RDS" → Amazon RDS
+2. Click **"Create database"**
+3. Configuration:
+
+| Setting | Value |
+|---------|-------|
+| Engine | PostgreSQL |
+| Version | 15.x |
+| Template | **Free tier** |
+| DB Instance ID | `payflow-db` |
+| Master username | `payflow_admin` |
+| Master password | (strong password — save it!) |
+| Instance class | `db.t3.micro` (free tier) |
+| Storage | 20 GB gp2 |
+| VPC | `payflow-vpc` |
+| Subnet group | Create new (both subnets) |
+| Public access | **No** (security!) |
+| Security group | `payflow-rds-sg` |
+| Initial DB name | `payflow_identity` |
+
+4. Click **"Create database"** (takes 5-10 minutes)
+
+### Using AWS CLI
 
 ```bash
 # Create DB subnet group
 aws rds create-db-subnet-group \
-  --db-subnet-group-name payflow-db-subnet \
+  --db-subnet-group-name payflow-db-subnets \
   --db-subnet-group-description "PayFlow DB subnets" \
-  --subnet-ids subnet-xxx subnet-yyy
+  --subnet-ids subnet-0aaa111bbb222ccc subnet-0ddd444eee555fff
 
-# Create RDS instance (Free Tier eligible)
+# Create RDS instance
 aws rds create-db-instance \
   --db-instance-identifier payflow-db \
   --db-instance-class db.t3.micro \
   --engine postgres \
-  --engine-version 15.4 \
+  --engine-version 15 \
   --master-username payflow_admin \
-  --master-user-password "${DB_PASSWORD}" \
+  --master-user-password "YourStrongPassword123!" \
   --allocated-storage 20 \
-  --storage-type gp2 \
-  --vpc-security-group-ids sg-rds \
-  --db-subnet-group-name payflow-db-subnet \
+  --db-name payflow_identity \
+  --vpc-security-group-ids sg-0rds789 \
+  --db-subnet-group-name payflow-db-subnets \
   --no-publicly-accessible \
-  --backup-retention-period 7 \
-  --preferred-backup-window "03:00-04:00" \
-  --preferred-maintenance-window "sun:04:00-sun:05:00" \
-  --no-multi-az \
-  --auto-minor-version-upgrade \
-  --tags Key=Project,Value=PayFlow
+  --backup-retention-period 7
 ```
 
-### Create Databases
+---
+
+## 2. Configure Security Group for RDS
+
+The RDS security group should ONLY allow connections from the EC2 security group:
 
 ```bash
-# Connect to RDS (from EC2)
-psql -h payflow-db.xxx.ap-south-1.rds.amazonaws.com \
-  -U payflow_admin -d postgres
-
-# Create service databases
-CREATE DATABASE payflow_identity;
-CREATE DATABASE payflow_merchant;
-CREATE DATABASE payflow_payment;
-CREATE DATABASE payflow_settlement;
-
-# Create service users (least privilege)
-CREATE USER identity_svc WITH PASSWORD 'xxx';
-GRANT ALL PRIVILEGES ON DATABASE payflow_identity TO identity_svc;
-
-CREATE USER payment_svc WITH PASSWORD 'xxx';
-GRANT ALL PRIVILEGES ON DATABASE payflow_payment TO payment_svc;
+# Allow PostgreSQL (5432) from EC2 instances only
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-0rds789 \
+  --protocol tcp \
+  --port 5432 \
+  --source-group sg-0ec2456
 ```
 
-## RDS Configuration
+```
+┌─────────────────────────────────────────────────┐
+│  RDS Security Group Rules                        │
+├────────────┬──────┬────────────────┬────────────┤
+│ Type       │ Port │ Source         │ Purpose    │
+├────────────┼──────┼────────────────┼────────────┤
+│ PostgreSQL │ 5432 │ sg-0ec2456     │ App access │
+│ (NO other rules — no public access!)            │
+└─────────────────────────────────────────────────┘
+```
 
-| Parameter | Value | Rationale |
-|-----------|-------|-----------|
-| Instance Class | db.t3.micro | Free Tier eligible |
-| Storage | 20 GB gp2 | Free Tier max |
-| Multi-AZ | No | Cost saving (portfolio project) |
-| Backup Retention | 7 days | Automatic daily backups |
-| Encryption | Yes (KMS default) | Security best practice |
-| Public Access | No | Only from EC2 via SG |
+---
 
-## DynamoDB Setup
+## 3. Save Endpoint URL
+
+Once RDS is "Available" (Status = green):
 
 ```bash
-# Create webhook delivery table
+# Get endpoint
+aws rds describe-db-instances \
+  --db-instance-identifier payflow-db \
+  --query "DBInstances[0].Endpoint.Address" \
+  --output text
+
+# Output: payflow-db.c9abc123xyz.ap-south-1.rds.amazonaws.com
+```
+
+**Save this for your application config:**
+
+```bash
+# Connection string format
+SPRING_DATASOURCE_URL=jdbc:postgresql://payflow-db.c9abc123xyz.ap-south-1.rds.amazonaws.com:5432/payflow_identity
+SPRING_DATASOURCE_USERNAME=payflow_admin
+SPRING_DATASOURCE_PASSWORD=YourStrongPassword123!
+```
+
+### Create Additional Databases
+
+SSH into EC2 (after Part 4), connect to RDS, and create remaining databases:
+
+```bash
+# From EC2 instance
+psql -h payflow-db.c9abc123xyz.ap-south-1.rds.amazonaws.com -U payflow_admin -d payflow_identity
+
+# Create other PayFlow databases
+CREATE DATABASE payflow_payments;
+CREATE DATABASE payflow_merchants;
+CREATE DATABASE payflow_settlements;
+```
+
+---
+
+## 4. Create DynamoDB Tables
+
+DynamoDB is used for high-throughput, low-latency data that doesn't need relational joins.
+
+### webhook_delivery Table
+
+```bash
 aws dynamodb create-table \
-  --table-name payflow-webhook-deliveries \
+  --table-name webhook_delivery \
   --attribute-definitions \
-    AttributeName=id,AttributeType=S \
+    AttributeName=webhookId,AttributeType=S \
+    AttributeName=deliveryId,AttributeType=S \
     AttributeName=merchantId,AttributeType=S \
-    AttributeName=createdAt,AttributeType=N \
   --key-schema \
-    AttributeName=id,KeyType=HASH \
-    AttributeName=createdAt,KeyType=RANGE \
-  --global-secondary-indexes '[
-    {
+    AttributeName=webhookId,KeyType=HASH \
+    AttributeName=deliveryId,KeyType=RANGE \
+  --global-secondary-indexes \
+    '[{
       "IndexName": "merchant-index",
       "KeySchema": [{"AttributeName":"merchantId","KeyType":"HASH"}],
       "Projection": {"ProjectionType":"ALL"},
       "ProvisionedThroughput": {"ReadCapacityUnits":5,"WriteCapacityUnits":5}
-    }
-  ]' \
-  --billing-mode PAY_PER_REQUEST \
+    }]' \
+  --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 \
   --tags Key=Project,Value=PayFlow
-
-# Enable TTL (auto-delete after 30 days)
-aws dynamodb update-time-to-live \
-  --table-name payflow-webhook-deliveries \
-  --time-to-live-specification Enabled=true,AttributeName=ttl
 ```
 
-## Kafka on EC2 (or SQS Alternative)
-
-### Option A: Kafka on EC2 (chosen for learning)
+### routing_metrics Table
 
 ```bash
-# On EC2 instance, use Docker Compose for Kafka
-# Included in the main docker-compose.yml
-
-# Kafka requires at minimum:
-# - 1GB RAM for broker
-# - 512MB for Zookeeper
-# Total: ~1.5GB just for messaging
-
-# For t2.micro (1GB RAM total) → use SQS instead
-# For t3.small (2GB RAM) → Kafka is viable
+aws dynamodb create-table \
+  --table-name routing_metrics \
+  --attribute-definitions \
+    AttributeName=routeId,AttributeType=S \
+    AttributeName=timestamp,AttributeType=N \
+  --key-schema \
+    AttributeName=routeId,KeyType=HASH \
+    AttributeName=timestamp,KeyType=RANGE \
+  --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 \
+  --tags Key=Project,Value=PayFlow
 ```
 
-### Option B: Amazon SQS (Free Tier friendly)
+### Verify Tables
 
 ```bash
-# Create SQS queues as Kafka alternative
-aws sqs create-queue --queue-name payflow-payment-events
-aws sqs create-queue --queue-name payflow-webhook-delivery
-aws sqs create-queue --queue-name payflow-notifications
-
-# Dead letter queue
-aws sqs create-queue --queue-name payflow-payment-events-dlq
+aws dynamodb list-tables
+# {
+#   "TableNames": ["routing_metrics", "webhook_delivery"]
+# }
 ```
 
-### SQS vs Kafka Decision
+---
 
-| Factor | Kafka (on EC2) | SQS |
-|--------|---------------|-----|
-| Cost | EC2 RAM usage | Free Tier: 1M requests |
-| Complexity | High (manage broker) | Zero (serverless) |
-| Event Replay | ✅ Yes | ❌ No |
-| Ordering | ✅ Per-partition | ✅ FIFO queues |
-| Learning Value | High | Lower |
-| **Decision** | ✅ Use if t3.small+ | Use if t2.micro only |
+## 5. Create SQS Queues
 
-## Redis on EC2 (vs ElastiCache)
+Amazon SQS provides reliable async messaging between services.
+
+### payment-events Queue
 
 ```bash
-# Option 1: ElastiCache (managed, costs after free tier)
-aws elasticache create-cache-cluster \
-  --cache-cluster-id payflow-redis \
-  --engine redis \
-  --cache-node-type cache.t3.micro \
-  --num-cache-nodes 1
+# Main queue
+aws sqs create-queue \
+  --queue-name payment-events \
+  --attributes '{
+    "VisibilityTimeout": "60",
+    "MessageRetentionPeriod": "1209600",
+    "ReceiveMessageWaitTimeSeconds": "20"
+  }'
 
-# Option 2: Redis in Docker on EC2 (free, simpler)
-# Already in docker-compose.yml
-docker run -d --name redis \
-  -p 6379:6379 \
-  redis:7-alpine \
-  redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+# Dead-letter queue (for failed messages)
+aws sqs create-queue \
+  --queue-name payment-events-dlq \
+  --attributes '{
+    "MessageRetentionPeriod": "1209600"
+  }'
+
+# Link DLQ to main queue
+aws sqs set-queue-attributes \
+  --queue-url https://sqs.ap-south-1.amazonaws.com/123456789012/payment-events \
+  --attributes '{
+    "RedrivePolicy": "{\"deadLetterTargetArn\":\"arn:aws:sqs:ap-south-1:123456789012:payment-events-dlq\",\"maxReceiveCount\":\"3\"}"
+  }'
 ```
 
-## Connection Strings (Environment Variables)
+### notification-events Queue
 
 ```bash
-# .env on EC2
-DB_HOST=payflow-db.xxx.ap-south-1.rds.amazonaws.com
-DB_PORT=5432
-DB_USERNAME=payflow_admin
-DB_PASSWORD=<from-secrets-manager>
+aws sqs create-queue --queue-name notification-events \
+  --attributes '{"VisibilityTimeout":"30","ReceiveMessageWaitTimeSeconds":"20"}'
 
-REDIS_HOST=localhost  # Redis in Docker on same EC2
-REDIS_PORT=6379
-
-KAFKA_SERVERS=localhost:9092  # Kafka in Docker on same EC2
-
-DYNAMODB_ENDPOINT=https://dynamodb.ap-south-1.amazonaws.com
-AWS_REGION=ap-south-1
+aws sqs create-queue --queue-name notification-events-dlq
 ```
 
-## Backup Strategy
+| Queue | Purpose | Visibility Timeout |
+|-------|---------|-------------------|
+| `payment-events` | Payment state changes | 60s |
+| `payment-events-dlq` | Failed payment messages | — |
+| `notification-events` | Email/SMS triggers | 30s |
+| `notification-events-dlq` | Failed notifications | — |
 
-| Data Store | Backup Method | Frequency | Retention |
-|-----------|---------------|-----------|-----------|
-| RDS PostgreSQL | Automated snapshots | Daily | 7 days |
-| DynamoDB | Point-in-time recovery | Continuous | 35 days |
-| Redis | Not backed up (cache only) | N/A | N/A |
-| Kafka logs | Not backed up (ephemeral) | N/A | 7 day retention |
+---
+
+## 6. Create SNS Topics
+
+SNS is used for fan-out notifications (one message → multiple subscribers).
+
+```bash
+# Email notifications topic
+aws sns create-topic --name payflow-email-notifications
+# Output: arn:aws:sns:ap-south-1:123456789012:payflow-email-notifications
+
+# SMS notifications topic
+aws sns create-topic --name payflow-sms-notifications
+# Output: arn:aws:sns:ap-south-1:123456789012:payflow-sms-notifications
+
+# Subscribe an email for testing
+aws sns subscribe \
+  --topic-arn arn:aws:sns:ap-south-1:123456789012:payflow-email-notifications \
+  --protocol email \
+  --notification-endpoint your-email@example.com
+
+# Confirm subscription (check your email!)
+```
+
+### Verify All Resources
+
+```bash
+# List queues
+aws sqs list-queues --queue-name-prefix payflow
+
+# List topics
+aws sns list-topics
+
+# List DynamoDB tables
+aws dynamodb list-tables
+
+# Check RDS status
+aws rds describe-db-instances --db-instance-identifier payflow-db --query "DBInstances[0].DBInstanceStatus"
+```
+
+---
+
+## What You Learned
+
+| # | Topic | Key Takeaway |
+|---|-------|-------------|
+| 1 | RDS PostgreSQL | Managed database with backups, free tier = db.t3.micro |
+| 2 | Security groups | RDS accessible ONLY from EC2 — never public |
+| 3 | Endpoint URL | Connection string for Spring Boot config |
+| 4 | DynamoDB | NoSQL for high-throughput webhook/routing data |
+| 5 | SQS queues | Async messaging with dead-letter queues for failures |
+| 6 | SNS topics | Fan-out notifications (email, SMS) |
+
+---
+
+## Common Errors & Fixes
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| RDS "Creating" for 15+ min | Normal — first creation is slow | Wait up to 20 minutes |
+| Can't connect to RDS from EC2 | Security group wrong | Verify SG allows 5432 from EC2's security group |
+| `FATAL: database does not exist` | Only initial DB created | Create additional databases via `psql` |
+| DynamoDB `ResourceInUseException` | Table already exists | Use different name or delete existing |
+| SQS message not received | `VisibilityTimeout` too low | Increase timeout above processing time |
+| SNS subscription "PendingConfirmation" | Email not confirmed | Check inbox (including spam) for confirmation link |
+
+---
+
+<div align="center">
+
+**[← Part 2: Networking & VPC](phase8-part2-networking-vpc.md)** | **[Documentation Index](../README.md)** | **[Part 4: Compute & Registry →](phase8-part4-compute-registry.md)**
+
+</div>

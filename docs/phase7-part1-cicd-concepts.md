@@ -1,145 +1,284 @@
-# Phase 7 Part 1: CI/CD Concepts
+# Phase 7 · Part 1 — CI/CD Concepts & GitHub Actions Fundamentals
 
-## Overview
+| Field | Value |
+|-------|-------|
+| **Project** | PayFlow Payment Gateway |
+| **Phase** | 7 — CI/CD Pipeline |
+| **Part** | 1 — CI/CD Concepts |
+| **Previous** | [Phase 6 Part 3 — Docker Compose](phase6-part3-docker-compose.md) |
+| **Next** | [Part 2 — Backend Pipeline](phase7-part2-backend-pipeline.md) |
+| **Time** | ~1.5 hours |
+| **Difficulty** | ★★☆☆☆ Beginner |
+| **Prerequisites** | Git basics, understanding of build/test/deploy |
 
-Foundational CI/CD concepts, deployment strategies, and theory behind automated software delivery pipelines.
+---
 
-## What is CI/CD?
+## Table of Contents
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Continuous Integration (CI)                                   │
-│ • Developers merge code frequently (daily)                   │
-│ • Automated build + tests run on every merge                 │
-│ • Catch bugs early, before they compound                     │
-├─────────────────────────────────────────────────────────────┤
-│ Continuous Delivery (CD)                                      │
-│ • Code is always in a deployable state                       │
-│ • Deploy to staging automatically                            │
-│ • One-click deploy to production (manual gate)               │
-├─────────────────────────────────────────────────────────────┤
-│ Continuous Deployment (Full CD)                               │
-│ • Every passing commit goes to production automatically      │
-│ • No manual approval step                                    │
-│ • Requires excellent test coverage + monitoring              │
-└─────────────────────────────────────────────────────────────┘
-```
+1. [What is CI? What is CD?](#1-what-is-ci-what-is-cd)
+2. [Why CI/CD Matters](#2-why-cicd-matters)
+3. [GitHub Actions Concepts](#3-github-actions-concepts)
+4. [YAML Syntax Basics](#4-yaml-syntax-basics)
+5. [Trigger Types](#5-trigger-types)
+6. [What You Learned](#what-you-learned)
+7. [Common Errors & Fixes](#common-errors--fixes)
 
-## CI/CD Pipeline Stages
+---
 
-| Stage | Purpose | Tools | Duration |
-|-------|---------|-------|----------|
-| Source | Code commit triggers pipeline | Git, GitHub | Instant |
-| Lint | Code quality checks | Checkstyle, ESLint | ~30s |
-| Build | Compile code, resolve deps | Maven, npm | ~2min |
-| Unit Test | Fast isolated tests | JUnit, Jest | ~1min |
-| Integration Test | DB + Kafka tests | Testcontainers | ~3min |
-| Security Scan | Vulnerability check | Trivy, OWASP | ~1min |
-| Docker Build | Create container image | Docker | ~2min |
-| Push | Upload to registry | ECR, Docker Hub | ~1min |
-| Deploy Staging | Release to staging env | SSH, ECS | ~2min |
-| Smoke Test | Basic health verification | curl, REST Assured | ~30s |
-| Deploy Production | Release to prod | Same as staging | ~2min |
+## 1. What is CI? What is CD?
 
-## Deployment Strategies Explained
+### Continuous Integration (CI)
 
-### Rolling Deployment
+**CI = automatically build and test code on every push.**
 
 ```
-Time 0: [V1] [V1] [V1] [V1]  ← 4 instances running V1
-Time 1: [V2] [V1] [V1] [V1]  ← Replace one at a time
-Time 2: [V2] [V2] [V1] [V1]
-Time 3: [V2] [V2] [V2] [V1]
-Time 4: [V2] [V2] [V2] [V2]  ← All running V2
-```
-- **Pros:** Zero downtime, gradual rollout
-- **Cons:** Temporary mixed versions, complex rollback
-
-### Blue-Green Deployment
-
-```
-┌─────────────┐     ┌─────────────┐
-│  BLUE (V1)  │ ←── │ Load        │ ← Active traffic
-│  (current)  │     │ Balancer    │
-└─────────────┘     └──────┬──────┘
-                           │
-┌─────────────┐            │
-│  GREEN (V2) │ ←──────────┘  (switch traffic)
-│  (new)      │
-└─────────────┘
-```
-- **Pros:** Instant rollback (switch back to blue), zero downtime
-- **Cons:** Double infrastructure cost during deployment
-
-### Canary Deployment
-
-```
-┌─────────────┐     ┌─────────────┐
-│  V1 (95%)   │ ←── │ Load        │
-│  [||||||||] │     │ Balancer    │
-└─────────────┘     └──────┬──────┘
-                           │ 5% traffic
-┌─────────────┐            │
-│  V2 (5%)    │ ←──────────┘
-│  [|]        │
-└─────────────┘
-
-Monitor metrics → if healthy → increase to 25% → 50% → 100%
-```
-- **Pros:** Minimal blast radius, data-driven decisions
-- **Cons:** Complex routing rules, monitoring required
-
-## PayFlow's Approach
-
-For a portfolio project on AWS Free Tier:
-- **Strategy:** In-place deployment (stop old, start new)
-- **Acceptable trade-off:** Brief downtime (~10s) during restart
-- **Risk mitigation:** Health checks, automated rollback script
-
-## GitFlow for PayFlow
-
-```
-main (production)
-  │
-  ├── develop (integration)
-  │     │
-  │     ├── feature/payment-refund
-  │     ├── feature/webhook-retry
-  │     └── bugfix/order-expiry
-  │
-  └── hotfix/security-patch (emergency fixes)
+Developer pushes code
+        │
+        ▼
+┌─────────────────────┐
+│  CI Pipeline Runs   │
+│  1. Checkout code   │
+│  2. Install deps    │
+│  3. Compile/Build   │
+│  4. Run tests       │
+│  5. Check coverage  │
+│  6. Report status   │
+└─────────┬───────────┘
+          │
+     ┌────┴────┐
+     │         │
+   ✅ PASS    ❌ FAIL
+   Merge OK    Fix needed
 ```
 
-## Branch Protection Rules
+### Continuous Delivery (CD)
 
-| Rule | Purpose |
-|------|---------|
-| Require PR review | At least 1 approval before merge |
-| Require passing CI | All tests must pass |
-| Require up-to-date | Branch must be current with main |
-| No force push | Protect commit history |
-
-## Artifact Versioning
+**CD = automatically deploy passing builds to production.**
 
 ```
-Image tag format: {service}:{git-sha-short}
-Example: payflow/payment-service:a1b2c3d
-
-For releases: payflow/payment-service:v1.2.3
+CI passes
+    │
+    ▼
+┌─────────────────────┐
+│  CD Pipeline Runs   │
+│  1. Build Docker    │
+│  2. Push to registry│
+│  3. Deploy to AWS   │
+│  4. Health check    │
+│  5. Notify team     │
+└─────────────────────┘
 ```
 
-## Rollback Procedure
+### The Full Picture
 
-```bash
-# If deployment fails:
-# 1. Identify last known good image
-docker images payflow/payment-service --format "{{.Tag}} {{.CreatedAt}}"
-
-# 2. Roll back to previous version
-docker stop payment-service
-docker run -d --name payment-service \
-  $ECR_REGISTRY/payflow/payment-service:previous-sha
-
-# 3. Investigate failure from logs
-docker logs payment-service-failed --tail 100
 ```
+[Code Push] → [Build] → [Test] → [Package] → [Deploy Staging] → [Deploy Prod]
+              └────── CI ──────┘  └─────────── CD ───────────────────────────┘
+```
+
+---
+
+## 2. Why CI/CD Matters
+
+### Without CI/CD
+
+```
+Monday:    Developer A pushes untested code
+Tuesday:   Developer B pushes code that breaks A's feature
+Wednesday: QA finds 5 bugs manually
+Thursday:  "Works on my machine" debates
+Friday:    Manual deploy at 11 PM, something breaks, weekend ruined 😰
+```
+
+### With CI/CD
+
+```
+Monday:    Developer A pushes → CI runs → tests pass → auto-deployed ✅
+Tuesday:   Developer B pushes → CI runs → test FAILS → fix in 10 min ✅
+Wednesday: Both features deployed, QA validates on staging ✅
+Thursday:  Metrics look good, promote to production ✅
+Friday:    Team leaves on time 🎉
+```
+
+**Key Benefits:**
+
+| Benefit | How |
+|---------|-----|
+| Catch bugs early | Tests run on every push |
+| Deploy confidently | Only passing code reaches production |
+| Faster releases | Automation removes manual steps |
+| Consistent builds | Same environment every time (no "works on my machine") |
+| Team visibility | Everyone sees build status |
+
+---
+
+## 3. GitHub Actions Concepts
+
+GitHub Actions is GitHub's built-in CI/CD platform. Here's the vocabulary:
+
+```
+┌─── WORKFLOW (.github/workflows/ci.yml) ──────────────────────────┐
+│                                                                    │
+│  TRIGGER: on push to main                                         │
+│                                                                    │
+│  ┌─── JOB: build ─────────────────────────────────────────────┐  │
+│  │  RUNNER: ubuntu-latest                                      │  │
+│  │                                                             │  │
+│  │  STEP 1: actions/checkout@v4        (check out code)       │  │
+│  │  STEP 2: actions/setup-java@v4      (install Java 17)      │  │
+│  │  STEP 3: run: mvn clean verify      (build + test)         │  │
+│  │  STEP 4: Upload coverage artifact                           │  │
+│  └─────────────────────────────────────────────────────────────┘  │
+│                                                                    │
+│  ┌─── JOB: docker (needs: build) ─────────────────────────────┐  │
+│  │  STEP 1: Build Docker image                                 │  │
+│  │  STEP 2: Push to ECR                                        │  │
+│  └─────────────────────────────────────────────────────────────┘  │
+│                                                                    │
+│  ┌─── JOB: deploy (needs: docker) ────────────────────────────┐  │
+│  │  STEP 1: SSH to EC2                                         │  │
+│  │  STEP 2: Pull new images                                    │  │
+│  │  STEP 3: docker compose up                                  │  │
+│  └─────────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+| Concept | Definition | PayFlow Example |
+|---------|-----------|-----------------|
+| **Workflow** | YAML file defining automation | `ci-backend.yml` |
+| **Trigger** | Event that starts the workflow | Push to `main`, PR to `main` |
+| **Job** | Set of steps on one runner | `build`, `docker`, `deploy` |
+| **Step** | Single task within a job | `mvn clean verify` |
+| **Runner** | VM that executes the job | `ubuntu-latest` |
+| **Action** | Reusable step (from marketplace) | `actions/checkout@v4` |
+| **Secret** | Encrypted variable | `AWS_ACCESS_KEY_ID` |
+| **Artifact** | File passed between jobs | JAR file, coverage report |
+
+---
+
+## 4. YAML Syntax Basics
+
+GitHub Actions workflows use YAML. Here's a quick reference:
+
+```yaml
+# Comments start with #
+
+# Key-value pairs
+name: CI Pipeline
+version: "3.8"
+
+# Nested objects (indent with 2 spaces)
+job:
+  name: Build
+  runs-on: ubuntu-latest
+
+# Lists (dash + space)
+steps:
+  - name: Checkout
+    uses: actions/checkout@v4
+  - name: Build
+    run: mvn clean package
+
+# Multi-line strings
+run: |
+  echo "Line 1"
+  echo "Line 2"
+  mvn clean verify
+
+# Inline list
+branches: [main, develop]
+
+# Environment variables
+env:
+  JAVA_VERSION: "17"
+  NODE_VERSION: "20"
+
+# Conditionals
+if: github.event_name == 'push'
+
+# Expressions
+timeout-minutes: ${{ secrets.TIMEOUT || 30 }}
+```
+
+---
+
+## 5. Trigger Types
+
+Workflows can be triggered by various events:
+
+```yaml
+on:
+  # ─── Push trigger ──────────────────────────
+  push:
+    branches: [main, develop]       # Only these branches
+    paths:
+      - 'backend/**'                # Only when backend files change
+      - '!backend/**/*.md'          # Except markdown files
+
+  # ─── Pull Request trigger ──────────────────
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize]    # When PR opened or updated
+
+  # ─── Schedule (cron) ───────────────────────
+  schedule:
+    - cron: '0 2 * * 1'            # Every Monday at 2 AM UTC
+
+  # ─── Manual trigger ────────────────────────
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options: [staging, production]
+
+  # ─── Other workflow completes ──────────────
+  workflow_run:
+    workflows: ["CI Backend"]
+    types: [completed]
+```
+
+### PayFlow Trigger Strategy
+
+| Workflow | Trigger | Path Filter |
+|---------|---------|-------------|
+| `ci-backend.yml` | push, PR to main | `backend/**` |
+| `ci-frontend.yml` | push, PR to main | `frontend/**` |
+| Deploy | Manual + after CI passes | N/A |
+
+---
+
+## What You Learned
+
+| # | Topic | Key Takeaway |
+|---|-------|-------------|
+| 1 | CI | Automatically build + test on every push |
+| 2 | CD | Automatically deploy passing builds |
+| 3 | Benefits | Catch bugs early, deploy confidently, faster releases |
+| 4 | Workflow | YAML file in `.github/workflows/` |
+| 5 | Job | Group of steps on one runner; jobs can depend on each other |
+| 6 | Triggers | push, pull_request, schedule, workflow_dispatch |
+| 7 | Path filters | Only run when relevant files change |
+
+---
+
+## Common Errors & Fixes
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| Workflow doesn't trigger | File not in `.github/workflows/` | Ensure correct directory path |
+| YAML parse error | Indentation wrong (tabs vs spaces) | Use 2-space indentation, no tabs |
+| `permission denied` on secret | Secret name typo | Check exact name in Settings → Secrets |
+| Job never runs | `needs` references non-existent job | Verify job names match |
+| Workflow runs on ALL pushes | Missing `paths` filter | Add path filter to limit scope |
+| Schedule doesn't fire | Cron only on default branch | Ensure workflow is on `main` branch |
+
+---
+
+<div align="center">
+
+**[← Phase 6 Part 3: Docker Compose](phase6-part3-docker-compose.md)** | **[Documentation Index](../README.md)** | **[Part 2: Backend Pipeline →](phase7-part2-backend-pipeline.md)**
+
+</div>

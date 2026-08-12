@@ -1,232 +1,329 @@
-# Phase 8 Part 4: Compute & Container Registry
+# Phase 8 · Part 4 — Compute & Container Registry
 
-## Overview
+| Field | Value |
+|-------|-------|
+| **Project** | PayFlow Payment Gateway |
+| **Phase** | 8 — AWS Deployment |
+| **Part** | 4 — EC2, Docker, and ECR |
+| **Previous** | [Part 3 — Database & Messaging](phase8-part3-database-messaging.md) |
+| **Next** | [Part 5 — Frontend Hosting](phase8-part5-frontend-hosting.md) |
+| **Time** | ~2 hours |
+| **Difficulty** | ★★★☆☆ Intermediate |
+| **Prerequisites** | VPC, security groups, Docker basics |
 
-EC2 instance setup, Docker installation, ECR repository creation, and running PayFlow services on AWS compute.
+---
 
-## EC2 Instance Setup
+## Table of Contents
+
+1. [Launch EC2 Instance](#1-launch-ec2-instance)
+2. [SSH into Instance](#2-ssh-into-instance)
+3. [Install Docker & Docker Compose](#3-install-docker--docker-compose)
+4. [Create ECR Repositories](#4-create-ecr-repositories)
+5. [Authenticate Docker to ECR](#5-authenticate-docker-to-ecr)
+6. [Build and Push First Image](#6-build-and-push-first-image)
+7. [Pull and Run on EC2](#7-pull-and-run-on-ec2)
+8. [What You Learned](#what-you-learned)
+9. [Common Errors & Fixes](#common-errors--fixes)
+
+---
+
+## 1. Launch EC2 Instance
+
+### Using AWS Console
+
+1. **Console** → EC2 → **"Launch Instance"**
+2. Configuration:
+
+| Setting | Value |
+|---------|-------|
+| Name | `payflow-server` |
+| AMI | Amazon Linux 2023 |
+| Instance type | `t2.micro` (free tier) or `t3.medium` (for all services) |
+| Key pair | Create new → `payflow-key` → Download `.pem` |
+| VPC | `payflow-vpc` |
+| Subnet | `payflow-public-1a` |
+| Auto-assign public IP | Enable |
+| Security group | `payflow-ec2-sg` |
+| Storage | 30 GB gp3 |
+
+3. Click **"Launch Instance"**
+
+### Using AWS CLI
 
 ```bash
-# Launch EC2 instance
-aws ec2 run-instances \
-  --image-id ami-0f5ee92e2d63afc18 \  # Amazon Linux 2023
-  --instance-type t3.small \
+# Create key pair
+aws ec2 create-key-pair \
   --key-name payflow-key \
-  --security-group-ids sg-ec2 \
-  --subnet-id subnet-public \
-  --iam-instance-profile Name=payflow-ec2-role \
-  --block-device-mappings '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":30,"VolumeType":"gp3"}}]' \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=payflow-server}]' \
-  --user-data file://init-script.sh
+  --query 'KeyMaterial' \
+  --output text > payflow-key.pem
+
+# Set permissions (Linux/Mac)
+chmod 400 payflow-key.pem
+
+# Launch instance
+aws ec2 run-instances \
+  --image-id ami-0c55b159cbfafe1f0 \
+  --instance-type t2.micro \
+  --key-name payflow-key \
+  --security-group-ids sg-0ec2456 \
+  --subnet-id subnet-0aaa111bbb222ccc \
+  --associate-public-ip-address \
+  --block-device-mappings '[{"DeviceName":"/dev/xvda","Ebs":{"VolumeSize":30}}]' \
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=payflow-server}]'
 ```
 
-### Instance Init Script
+---
+
+## 2. SSH into Instance
+
+### Get Public IP
 
 ```bash
-#!/bin/bash
-# init-script.sh (EC2 user data)
+aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=payflow-server" \
+  --query "Reservations[0].Instances[0].PublicIpAddress" \
+  --output text
+# Output: 13.235.xx.xx
+```
 
+### Connect
+
+```bash
+# Linux/Mac
+ssh -i payflow-key.pem ec2-user@13.235.xx.xx
+
+# Windows (PowerShell)
+ssh -i .\payflow-key.pem ec2-user@13.235.xx.xx
+```
+
+### First-Time Setup
+
+```bash
 # Update system
-yum update -y
+sudo dnf update -y
 
-# Install Docker
-yum install -y docker
-systemctl start docker
-systemctl enable docker
-usermod -aG docker ec2-user
+# Check instance info
+cat /etc/os-release
+# Amazon Linux 2023
 
-# Install Docker Compose
-curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
-  -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
-
-# Install AWS CLI (already on Amazon Linux)
-# Install Java 17 (for troubleshooting)
-yum install -y java-17-amazon-corretto-headless
-
-# Create app directory
-mkdir -p /home/ec2-user/payflow
-chown ec2-user:ec2-user /home/ec2-user/payflow
-
-# Login to ECR (will be done by CI/CD)
-# aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin ACCOUNT.dkr.ecr.ap-south-1.amazonaws.com
+uname -m
+# x86_64
 ```
 
-## ECR Repository Setup
+---
+
+## 3. Install Docker & Docker Compose
 
 ```bash
-# Create repositories for each service
-SERVICES=(api-gateway identity-service merchant-service payment-service routing-service bank-simulator settlement-service webhook-service notification-service)
+# ─── Install Docker ──────────────────────────────────
+sudo dnf install -y docker
+
+# Start Docker service
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Add ec2-user to docker group (avoid sudo for docker commands)
+sudo usermod -aG docker ec2-user
+
+# Apply group change (logout/login or use newgrp)
+newgrp docker
+
+# Verify Docker
+docker --version
+# Docker version 24.x.x
+
+docker run hello-world
+# ✅ Hello from Docker!
+
+# ─── Install Docker Compose V2 ───────────────────────
+sudo mkdir -p /usr/local/lib/docker/cli-plugins
+sudo curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+# Verify Compose
+docker compose version
+# Docker Compose version v2.x.x
+
+# ─── Install AWS CLI (if not pre-installed) ──────────
+# Amazon Linux 2023 usually has it pre-installed
+aws --version
+```
+
+---
+
+## 4. Create ECR Repositories
+
+AWS Elastic Container Registry (ECR) stores your Docker images — one repository per service.
+
+```bash
+# Create repositories for all 11 services
+SERVICES=(
+  "api-gateway"
+  "identity-service"
+  "merchant-service"
+  "payment-service"
+  "routing-engine"
+  "bank-simulator"
+  "settlement-service"
+  "notification-service"
+  "webhook-service"
+  "analytics-service"
+  "reconciliation-service"
+)
 
 for svc in "${SERVICES[@]}"; do
   aws ecr create-repository \
-    --repository-name payflow/${svc} \
+    --repository-name "payflow-${svc}" \
     --image-scanning-configuration scanOnPush=true \
-    --encryption-configuration encryptionType=AES256 \
     --tags Key=Project,Value=PayFlow
+  echo "✅ Created: payflow-${svc}"
 done
-
-# Set lifecycle policy (keep only last 5 images)
-aws ecr put-lifecycle-policy \
-  --repository-name payflow/payment-service \
-  --lifecycle-policy-text '{
-    "rules": [
-      {
-        "rulePriority": 1,
-        "description": "Keep only 5 images",
-        "selection": {
-          "tagStatus": "any",
-          "countType": "imageCountMoreThan",
-          "countNumber": 5
-        },
-        "action": { "type": "expire" }
-      }
-    ]
-  }'
 ```
 
-## Docker on EC2
-
-### Docker Compose for Production
-
-```yaml
-# /home/ec2-user/payflow/docker-compose.yml
-version: '3.8'
-
-services:
-  redis:
-    image: redis:7-alpine
-    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
-    ports: ["6379:6379"]
-    restart: always
-
-  kafka:
-    image: confluentinc/cp-kafka:7.5.0
-    depends_on: [zookeeper]
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-    restart: always
-
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.5.0
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-    restart: always
-
-  api-gateway:
-    image: ${ECR_REGISTRY}/payflow/api-gateway:latest
-    ports: ["8080:8080"]
-    env_file: .env
-    depends_on: [redis]
-    restart: always
-    deploy:
-      resources:
-        limits: { memory: 256M }
-
-  identity-service:
-    image: ${ECR_REGISTRY}/payflow/identity-service:latest
-    ports: ["8081:8081"]
-    env_file: .env
-    restart: always
-    deploy:
-      resources:
-        limits: { memory: 256M }
-
-  merchant-service:
-    image: ${ECR_REGISTRY}/payflow/merchant-service:latest
-    ports: ["8083:8083"]
-    env_file: .env
-    restart: always
-    deploy:
-      resources:
-        limits: { memory: 256M }
-
-  payment-service:
-    image: ${ECR_REGISTRY}/payflow/payment-service:latest
-    ports: ["8082:8082"]
-    env_file: .env
-    depends_on: [redis, kafka]
-    restart: always
-    deploy:
-      resources:
-        limits: { memory: 384M }
-
-  routing-service:
-    image: ${ECR_REGISTRY}/payflow/routing-service:latest
-    ports: ["8084:8084"]
-    env_file: .env
-    restart: always
-    deploy:
-      resources:
-        limits: { memory: 256M }
-
-  bank-simulator:
-    image: ${ECR_REGISTRY}/payflow/bank-simulator:latest
-    ports: ["9090:9090"]
-    restart: always
-    deploy:
-      resources:
-        limits: { memory: 128M }
-```
-
-### Environment File
+### Verify Repositories
 
 ```bash
-# /home/ec2-user/payflow/.env
-DB_HOST=payflow-db.xxx.rds.amazonaws.com
-DB_PORT=5432
-DB_USERNAME=payflow_admin
-DB_PASSWORD=<secure-password>
-JWT_SECRET=<base64-encoded-secret>
-REDIS_HOST=redis
-KAFKA_SERVERS=kafka:29092
-AWS_REGION=ap-south-1
-ECR_REGISTRY=123456789.dkr.ecr.ap-south-1.amazonaws.com
+aws ecr describe-repositories --query "repositories[].repositoryName" --output table
+# ┌───────────────────────────────────┐
+# │       repositoryName              │
+# ├───────────────────────────────────┤
+# │  payflow-api-gateway              │
+# │  payflow-identity-service         │
+# │  payflow-merchant-service         │
+# │  payflow-payment-service          │
+# │  payflow-routing-engine           │
+# │  payflow-bank-simulator           │
+# │  payflow-settlement-service       │
+# │  payflow-notification-service     │
+# │  payflow-webhook-service          │
+# │  payflow-analytics-service        │
+# │  payflow-reconciliation-service   │
+# └───────────────────────────────────┘
 ```
 
-## Instance Sizing Guide
+---
 
-| Instance | vCPU | RAM | Cost/Month | Suitable For |
-|----------|------|-----|-----------|--------------|
-| t2.micro | 1 | 1GB | Free Tier | 2-3 services only |
-| **t3.small** | 2 | 2GB | ~$15 | **All services (tight)** |
-| t3.medium | 2 | 4GB | ~$30 | Comfortable for all |
+## 5. Authenticate Docker to ECR
 
-## Memory Budget (t3.small: 2GB)
-
-| Component | Memory |
-|-----------|--------|
-| OS + Docker | 200MB |
-| Redis | 128MB |
-| Kafka + Zookeeper | 600MB |
-| API Gateway | 200MB |
-| Payment Service | 256MB |
-| Other Services (5×128MB) | 640MB |
-| **Total** | **~2GB** |
-
-## Deployment Script
+ECR requires authentication — the token is valid for 12 hours.
 
 ```bash
-#!/bin/bash
-# deploy.sh - Run on EC2 to pull and restart
-set -e
-
-ECR_REGISTRY="123456789.dkr.ecr.ap-south-1.amazonaws.com"
-
-# Login to ECR
+# Get ECR login token and pipe to docker login
 aws ecr get-login-password --region ap-south-1 | \
-  docker login --username AWS --password-stdin $ECR_REGISTRY
+  docker login --username AWS --password-stdin \
+  123456789012.dkr.ecr.ap-south-1.amazonaws.com
 
-# Pull latest images
-docker compose pull
-
-# Restart with new images
-docker compose up -d --remove-orphans
-
-# Wait and check health
-sleep 20
-curl -f http://localhost:8080/actuator/health && echo "✅ Healthy" || echo "❌ Unhealthy"
+# Output: Login Succeeded ✅
 ```
+
+**Registry URL format:** `{account-id}.dkr.ecr.{region}.amazonaws.com`
+
+---
+
+## 6. Build and Push First Image
+
+Let's push the payment-service as an example.
+
+### On Your Local Machine (or CI)
+
+```bash
+# Navigate to service directory
+cd backend/payment-service
+
+# Build the Docker image
+docker build -t payflow-payment-service:1.0.0 .
+
+# Tag for ECR
+docker tag payflow-payment-service:1.0.0 \
+  123456789012.dkr.ecr.ap-south-1.amazonaws.com/payflow-payment-service:1.0.0
+
+docker tag payflow-payment-service:1.0.0 \
+  123456789012.dkr.ecr.ap-south-1.amazonaws.com/payflow-payment-service:latest
+
+# Push to ECR
+docker push 123456789012.dkr.ecr.ap-south-1.amazonaws.com/payflow-payment-service:1.0.0
+docker push 123456789012.dkr.ecr.ap-south-1.amazonaws.com/payflow-payment-service:latest
+```
+
+### Verify in ECR
+
+```bash
+aws ecr list-images --repository-name payflow-payment-service
+# {
+#   "imageIds": [
+#     {"imageTag": "1.0.0", "imageDigest": "sha256:abc123..."},
+#     {"imageTag": "latest", "imageDigest": "sha256:abc123..."}
+#   ]
+# }
+```
+
+---
+
+## 7. Pull and Run on EC2
+
+SSH into your EC2 instance and pull the image:
+
+```bash
+# On EC2 — authenticate to ECR
+aws ecr get-login-password --region ap-south-1 | \
+  docker login --username AWS --password-stdin \
+  123456789012.dkr.ecr.ap-south-1.amazonaws.com
+
+# Pull the image
+docker pull 123456789012.dkr.ecr.ap-south-1.amazonaws.com/payflow-payment-service:latest
+
+# Run it
+docker run -d \
+  --name payment-service \
+  -p 8082:8080 \
+  -e SPRING_PROFILES_ACTIVE=prod \
+  -e SPRING_DATASOURCE_URL=jdbc:postgresql://payflow-db.xxx.rds.amazonaws.com:5432/payflow_payments \
+  -e SPRING_DATASOURCE_USERNAME=payflow_admin \
+  -e SPRING_DATASOURCE_PASSWORD=YourStrongPassword123! \
+  123456789012.dkr.ecr.ap-south-1.amazonaws.com/payflow-payment-service:latest
+
+# Verify it's running
+docker ps
+docker logs payment-service
+
+# Test health endpoint
+curl http://localhost:8082/actuator/health
+# {"status":"UP"}
+```
+
+---
+
+## What You Learned
+
+| # | Topic | Key Takeaway |
+|---|-------|-------------|
+| 1 | EC2 launch | Amazon Linux 2023 + t2.micro for free tier |
+| 2 | SSH access | .pem key file + security group port 22 |
+| 3 | Docker on EC2 | Install, start, add user to docker group |
+| 4 | ECR repositories | One repo per service, image scanning enabled |
+| 5 | ECR auth | `get-login-password` piped to `docker login` |
+| 6 | Build + push | Tag with registry URL, push both version + latest |
+| 7 | Pull + run | Pull from ECR on EC2, run with environment config |
+
+---
+
+## Common Errors & Fixes
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `Permission denied (publickey)` | Wrong .pem file or wrong permissions | `chmod 400 payflow-key.pem`, verify correct file |
+| `Connection timed out` SSH | Security group missing SSH rule | Add port 22 inbound from your IP |
+| `docker: Got permission denied` | User not in docker group | Run `newgrp docker` or logout/login |
+| ECR `no basic auth credentials` | Auth token expired (12 hours) | Re-run `aws ecr get-login-password` command |
+| `no space left on device` | 8GB default storage full | Use 30GB when launching instance |
+| Image push slow | Large image + slow upload | Use multi-stage builds for smaller images |
+| `requested access to resource is denied` | Wrong ECR URL or repo doesn't exist | Verify repository name and account ID |
+
+---
+
+<div align="center">
+
+**[← Part 3: Database & Messaging](phase8-part3-database-messaging.md)** | **[Documentation Index](../README.md)** | **[Part 5: Frontend Hosting →](phase8-part5-frontend-hosting.md)**
+
+</div>
