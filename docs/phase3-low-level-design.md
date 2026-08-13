@@ -699,7 +699,7 @@ public class RoutingService {
 ```java
 // File: backend/identity-service/src/main/java/com/payflow/identity/controller/AuthController.java
 @RestController
-@RequestMapping("/api/v1/auth")
+@RequestMapping("/v1/auth")
 public class AuthController {
     @PostMapping("/register")     → 201 Created → AuthResponse
     @PostMapping("/login")        → 200 OK     → AuthResponse
@@ -714,7 +714,7 @@ public class AuthController {
 ```java
 // File: backend/merchant-service/src/main/java/com/payflow/merchant/controller/MerchantController.java
 @RestController
-@RequestMapping("/api/v1/merchants")
+@RequestMapping("/v1/merchants")
 public class MerchantController {
     @PostMapping                   → 201 Created → MerchantResponse
     @GetMapping("/{id}")          → 200 OK     → MerchantResponse
@@ -725,7 +725,7 @@ public class MerchantController {
 
 // File: backend/merchant-service/src/main/java/com/payflow/merchant/controller/ApiKeyController.java
 @RestController
-@RequestMapping("/api/v1/merchants/{merchantId}/api-keys")
+@RequestMapping("/v1/merchants/{merchantId}/api-keys")
 public class ApiKeyController {
     @PostMapping                   → 201 Created → ApiKeyResponse (raw key shown ONCE)
     @GetMapping                    → 200 OK     → List<ApiKeyResponse>
@@ -739,7 +739,7 @@ public class ApiKeyController {
 ```java
 // File: backend/payment-service/src/main/java/com/payflow/payment/controller/OrderController.java
 @RestController
-@RequestMapping("/api/v1/orders")
+@RequestMapping("/v1/orders")
 public class OrderController {
     @PostMapping                   → 201 Created → OrderResponse
     @GetMapping("/{id}")          → 200 OK     → OrderResponse
@@ -748,7 +748,7 @@ public class OrderController {
 
 // File: backend/payment-service/src/main/java/com/payflow/payment/controller/PaymentController.java
 @RestController
-@RequestMapping("/api/v1/payments")
+@RequestMapping("/v1/payments")
 public class PaymentController {
     @PostMapping("/{orderId}/authorize") → 200 OK → PaymentResponse
     @PostMapping("/{id}/capture")        → 200 OK → PaymentResponse
@@ -763,7 +763,7 @@ public class PaymentController {
 ```java
 // File: backend/routing-service/src/main/java/com/payflow/routing/controller/RoutingController.java
 @RestController
-@RequestMapping("/api/v1/routing")
+@RequestMapping("/v1/routing")
 public class RoutingController {
     @PostMapping("/authorize")    → 200 OK → RoutingResponse
     @PostMapping("/capture")      → 200 OK → RoutingResponse
@@ -840,15 +840,15 @@ spring:
         - id: identity-public
           uri: lb://identity-service
           predicates:
-            - Path=/api/v1/auth/**
+            - Path=/v1/auth/**
         - id: merchant-service
           uri: lb://merchant-service
           predicates:
-            - Path=/api/v1/merchants/**
+            - Path=/v1/merchants/**
         - id: payment-service
           uri: lb://payment-service
           predicates:
-            - Path=/api/v1/payments/**, /api/v1/orders/**
+            - Path=/v1/payments/**, /v1/orders/**
   data:
     redis:
       host: localhost

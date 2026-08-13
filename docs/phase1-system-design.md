@@ -814,7 +814,7 @@ Before listing endpoints, let's establish our API design principles:
 | Principle | Implementation | Example |
 |-----------|---------------|---------|
 | RESTful | Resources as nouns, HTTP verbs for actions | `POST /payments` not `POST /createPayment` |
-| Versioned | URL path versioning | `/api/v1/payments` |
+| Versioned | URL path versioning | `/v1/payments` |
 | Consistent | Standard response envelope | `{ "success": true, "data": {...}, "error": null }` |
 | Idempotent | Idempotency-Key header for POST/PATCH | Header: `Idempotency-Key: uuid` |
 | Paginated | Cursor-based pagination | `?cursor=abc&limit=20` |
@@ -884,7 +884,7 @@ Error response:
 
 ### 🔐 Identity Service API
 
-**Base URL:** `/api/v1/identity`
+**Base URL:** `/v1/identity`
 **Auth:** Public (register/login) or JWT (profile/refresh)
 
 | # | Method | Endpoint | Description | Auth | Request Body | Response |
@@ -903,7 +903,7 @@ Error response:
 **Register Request Example:**
 
 ```http
-POST /api/v1/identity/register
+POST /v1/identity/register
 Content-Type: application/json
 
 {
@@ -932,7 +932,7 @@ Content-Type: application/json
 
 ### 🏪 Merchant Service API
 
-**Base URL:** `/api/v1/merchants`
+**Base URL:** `/v1/merchants`
 **Auth:** JWT (Dashboard) or API Key (Server-to-Server)
 
 | # | Method | Endpoint | Description | Auth | Request Body | Response |
@@ -972,7 +972,7 @@ Content-Type: application/json
 
 ### 💳 Payment Service API
 
-**Base URL:** `/api/v1/payments`
+**Base URL:** `/v1/payments`
 **Auth:** API Key + HMAC Signature (Server-to-Server)
 
 | # | Method | Endpoint | Description | Auth | Idempotent | Request Body | Response |
@@ -992,7 +992,7 @@ Content-Type: application/json
 **Create Order Request:**
 
 ```http
-POST /api/v1/payments/orders
+POST /v1/payments/orders
 Content-Type: application/json
 X-Api-Key: key_live_a1b2c3d4e5
 X-Timestamp: 2024-01-15T10:30:00Z
@@ -1013,7 +1013,7 @@ Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000
 **Authorize Payment Request:**
 
 ```http
-POST /api/v1/payments/orders/ord_a1b2c3d4/authorize
+POST /v1/payments/orders/ord_a1b2c3d4/authorize
 Content-Type: application/json
 X-Api-Key: key_live_a1b2c3d4e5
 X-Timestamp: 2024-01-15T10:30:05Z
@@ -1064,7 +1064,7 @@ Idempotency-Key: 660e8400-e29b-41d4-a716-446655440001
 
 ### 🏦 Settlement Service API
 
-**Base URL:** `/api/v1/settlements`
+**Base URL:** `/v1/settlements`
 **Auth:** JWT (Admin/Internal)
 
 | # | Method | Endpoint | Description | Auth | Request Body | Response |
@@ -2402,14 +2402,14 @@ RS256(base64(header) + "." + base64(payload), privateKey)
 │                                                                        │
 │  2. Build signature string:                                            │
 │     string_to_sign = timestamp + "|" + "POST" + "|"                  │
-│                      + "/api/v1/payments/orders" + "|"                │
+│                      + "/v1/payments/orders" + "|"                │
 │                      + SHA256(body)                                    │
 │                                                                        │
 │  3. Calculate HMAC:                                                    │
 │     signature = HMAC-SHA256(string_to_sign, api_secret)              │
 │                                                                        │
 │  4. Send request:                                                      │
-│     POST /api/v1/payments/orders                                      │
+│     POST /v1/payments/orders                                      │
 │     X-Api-Key: key_live_a1b2c3d4                                     │
 │     X-Timestamp: 2024-01-15T10:30:00Z                                │
 │     X-Signature: <base64(signature)>                                  │

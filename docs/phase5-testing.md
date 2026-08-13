@@ -252,7 +252,7 @@ class PaymentControllerTest {
     private ObjectMapper objectMapper;
 
     @Test
-    @DisplayName("POST /api/v1/payments/orders - should create order")
+    @DisplayName("POST /v1/payments/orders - should create order")
     void shouldCreateOrder() throws Exception {
         // Given
         CreateOrderRequest request = new CreateOrderRequest(
@@ -267,7 +267,7 @@ class PaymentControllerTest {
         when(paymentService.createOrder(any())).thenReturn(mockOrder);
 
         // When & Then
-        mockMvc.perform(post("/api/v1/payments/orders")
+        mockMvc.perform(post("/v1/payments/orders")
                 .contentType(MediaType.APPLICATION_JSON)
                 .header("Authorization", "Bearer valid-token")
                 .header("X-Idempotency-Key", "idem-key-1")
@@ -279,13 +279,13 @@ class PaymentControllerTest {
     }
 
     @Test
-    @DisplayName("POST /api/v1/payments/orders - should return 400 for invalid request")
+    @DisplayName("POST /v1/payments/orders - should return 400 for invalid request")
     void shouldReturn400ForInvalidRequest() throws Exception {
         CreateOrderRequest request = new CreateOrderRequest(
             BigDecimal.valueOf(-100), null, null, null  // all invalid
         );
 
-        mockMvc.perform(post("/api/v1/payments/orders")
+        mockMvc.perform(post("/v1/payments/orders")
                 .contentType(MediaType.APPLICATION_JSON)
                 .header("Authorization", "Bearer valid-token")
                 .content(objectMapper.writeValueAsString(request)))
@@ -294,11 +294,11 @@ class PaymentControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/payments/orders/{id} - should return 404 for unknown order")
+    @DisplayName("GET /v1/payments/orders/{id} - should return 404 for unknown order")
     void shouldReturn404ForUnknownOrder() throws Exception {
         when(paymentService.getOrder("unknown")).thenThrow(new OrderNotFoundException("unknown"));
 
-        mockMvc.perform(get("/api/v1/payments/orders/unknown")
+        mockMvc.perform(get("/v1/payments/orders/unknown")
                 .header("Authorization", "Bearer valid-token"))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.error").value("ORDER_NOT_FOUND"));
@@ -307,7 +307,7 @@ class PaymentControllerTest {
     @Test
     @DisplayName("Should return 401 without auth token")
     void shouldReturn401WithoutToken() throws Exception {
-        mockMvc.perform(post("/api/v1/payments/orders")
+        mockMvc.perform(post("/v1/payments/orders")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
             .andExpect(status().isUnauthorized());
@@ -414,20 +414,20 @@ class PaymentFlowIntegrationTest {
     @DisplayName("Full payment lifecycle: create → authorize → capture")
     void fullPaymentLifecycle() {
         // 1. Create Order
-        var createResp = restTemplate.postForEntity("/api/v1/payments/orders",
+        var createResp = restTemplate.postForEntity("/v1/payments/orders",
             new CreateOrderRequest(BigDecimal.valueOf(1000), "INR", "m-001", "key-1"),
             PaymentOrderResponse.class);
         assertThat(createResp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         String orderId = createResp.getBody().getId();
 
         // 2. Authorize Payment
-        var authResp = restTemplate.postForEntity("/api/v1/payments/orders/" + orderId + "/authorize",
+        var authResp = restTemplate.postForEntity("/v1/payments/orders/" + orderId + "/authorize",
             new AuthorizeRequest("CARD", cardDetails()),
             PaymentOrderResponse.class);
         assertThat(authResp.getBody().getStatus()).isEqualTo("AUTHORIZED");
 
         // 3. Capture Payment
-        var captureResp = restTemplate.postForEntity("/api/v1/payments/orders/" + orderId + "/capture",
+        var captureResp = restTemplate.postForEntity("/v1/payments/orders/" + orderId + "/capture",
             new CaptureRequest(BigDecimal.valueOf(1000)),
             PaymentOrderResponse.class);
         assertThat(captureResp.getBody().getStatus()).isEqualTo("CAPTURED");

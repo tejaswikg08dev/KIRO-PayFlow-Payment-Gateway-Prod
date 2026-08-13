@@ -104,7 +104,7 @@ aws elbv2 create-listener \
 
 | Path Pattern | Forward To | Purpose |
 |-------------|-----------|---------|
-| `/api/v1/*` | payflow-backend-tg (EC2:8080) | API requests |
+| `/v1/*` | payflow-backend-tg (EC2:8080) | API requests |
 | `/actuator/*` | payflow-backend-tg (EC2:8080) | Health checks |
 | `/checkout/*` | payflow-backend-tg (EC2:8080) | Hosted checkout |
 
@@ -291,19 +291,19 @@ Full lifecycle test: register → login → create payment.
 
 ```bash
 # 1. Register a merchant
-curl -X POST http://ALB-DNS:8080/api/v1/auth/register \
+curl -X POST http://ALB-DNS:8080/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"test@merchant.com","password":"Test123!","businessName":"Test Merchant"}'
 
 # 2. Login
-TOKEN=$(curl -s -X POST http://ALB-DNS:8080/api/v1/auth/login \
+TOKEN=$(curl -s -X POST http://ALB-DNS:8080/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"test@merchant.com","password":"Test123!"}' | jq -r '.token')
 
 echo "Token: $TOKEN"
 
 # 3. Create payment order
-curl -X POST http://ALB-DNS:8080/api/v1/payments/orders \
+curl -X POST http://ALB-DNS:8080/v1/payments/orders \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -H "X-Idempotency-Key: test-$(date +%s)" \

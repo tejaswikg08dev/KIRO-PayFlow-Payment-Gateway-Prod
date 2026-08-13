@@ -59,7 +59,7 @@ export function CheckoutPage() {
   const { sessionId } = useParams();
   const { data: session } = useQuery({
     queryKey: ['checkout-session', sessionId],
-    queryFn: () => apiClient.get(`/api/v1/checkout/sessions/${sessionId}`),
+    queryFn: () => apiClient.get(`/v1/checkout/sessions/${sessionId}`),
   });
 
   const [method, setMethod] = useState<'card' | 'upi' | 'netbanking'>('card');
@@ -144,7 +144,7 @@ export function CardForm({ session }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const payMutation = useMutation({
-    mutationFn: (payload) => apiClient.post(`/api/v1/checkout/sessions/${session.id}/pay`, payload),
+    mutationFn: (payload) => apiClient.post(`/v1/checkout/sessions/${session.id}/pay`, payload),
     onSuccess: (data) => navigate(`/checkout/status/${data.paymentId}`),
     onError: (err) => navigate(`/checkout/status/failed`),
   });
@@ -226,7 +226,7 @@ export function UpiForm({ session }) {
   const navigate = useNavigate();
 
   const payMutation = useMutation({
-    mutationFn: (payload) => apiClient.post(`/api/v1/checkout/sessions/${session.id}/pay`, payload),
+    mutationFn: (payload) => apiClient.post(`/v1/checkout/sessions/${session.id}/pay`, payload),
     onSuccess: (data) => navigate(`/checkout/status/${data.paymentId}`),
   });
 
@@ -282,7 +282,7 @@ export function NetBankingForm({ session }) {
   const navigate = useNavigate();
 
   const payMutation = useMutation({
-    mutationFn: (payload) => apiClient.post(`/api/v1/checkout/sessions/${session.id}/pay`, payload),
+    mutationFn: (payload) => apiClient.post(`/v1/checkout/sessions/${session.id}/pay`, payload),
     onSuccess: (data) => navigate(`/checkout/status/${data.paymentId}`),
   });
 
@@ -339,7 +339,7 @@ export function PaymentStatus() {
   const { paymentId } = useParams();
   const { data: status } = useQuery({
     queryKey: ['payment-status', paymentId],
-    queryFn: () => apiClient.get(`/api/v1/checkout/status/${paymentId}`),
+    queryFn: () => apiClient.get(`/v1/checkout/status/${paymentId}`),
     refetchInterval: (data) => data?.status === 'PENDING' ? 2000 : false, // Poll while pending
   });
 

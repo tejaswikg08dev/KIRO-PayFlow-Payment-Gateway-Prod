@@ -182,7 +182,7 @@
 │Backend │    │  way    │    │Service  │    │Service  │    │(Acquirer)│    │      │
 └───┬────┘    └────┬────┘    └────┬────┘    └────┬────┘    └────┬─────┘    └──┬───┘
     │              │              │              │               │             │
-    │ POST /api/v1/payments/authorize           │               │             │
+    │ POST /v1/payments/authorize           │               │             │
     │─────────────►│              │              │               │             │
     │              │              │              │               │             │
     │              │ Validate API Key            │               │             │
@@ -281,7 +281,7 @@
 │Backend │    │  way    │    │Service  │    │Service  │    │(Acquirer)│    │      │
 └───┬────┘    └────┬────┘    └────┬────┘    └────┬────┘    └────┬─────┘    └──┬───┘
     │              │              │              │               │             │
-    │ POST /api/v1/payments/{id}/capture        │               │             │
+    │ POST /v1/payments/{id}/capture        │               │             │
     │ { amount: 800.00 }         │              │               │             │
     │─────────────►│              │              │               │             │
     │              │              │              │               │             │
@@ -334,7 +334,7 @@
 │Backend │    │  way    │    │Service  │    │Service  │    │(Acquirer)│    │      │
 └───┬────┘    └────┬────┘    └────┬────┘    └────┬────┘    └────┬─────┘    └──┬───┘
     │              │              │              │               │             │
-    │ POST /api/v1/payments/{id}/refund         │               │             │
+    │ POST /v1/payments/{id}/refund         │               │             │
     │ { amount: 200.00, reason: "Customer request" }            │             │
     │─────────────►│              │              │               │             │
     │              │              │              │               │             │
@@ -389,7 +389,7 @@
 │(Person) │    │  way    │    │ Service  │    │ Service  │    │      │
 └───┬─────┘    └────┬────┘    └────┬─────┘    └────┬─────┘    └──┬───┘
     │               │              │               │              │
-    │ POST /api/v1/auth/register   │               │              │
+    │ POST /v1/auth/register   │               │              │
     │ { email, password, fullName, role: MERCHANT }│              │
     │──────────────►│              │               │              │
     │               │─────────────►│               │              │
@@ -402,7 +402,7 @@
     │ 201 { accessToken, refreshToken, user }      │              │
     │◄──────────────│◄─────────────│               │              │
     │               │              │               │              │
-    │ POST /api/v1/merchants       │               │              │
+    │ POST /v1/merchants       │               │              │
     │ { businessName, pan, gst, bankAccount, ... } │              │
     │──────────────►│              │               │              │
     │               │──────────────────────────────►│              │
@@ -444,7 +444,7 @@
 │(Browser│    │  way    │    │ Service  │    │          │    │      │
 └───┬────┘    └────┬────┘    └────┬─────┘    └────┬─────┘    └──┬───┘
     │              │              │               │              │
-    │ POST /api/v1/auth/register  │               │              │
+    │ POST /v1/auth/register  │               │              │
     │ { email, password, fullName }               │              │
     │─────────────►│              │               │              │
     │              │              │               │              │
@@ -715,7 +715,7 @@ Net Settlement: ₹4,149.70
 │        │    │  way    │    │ Service  │    │          │
 └───┬────┘    └────┬────┘    └────┬─────┘    └────┬─────┘
     │              │              │               │
-    │ POST /api/v1/auth/refresh   │               │
+    │ POST /v1/auth/refresh   │               │
     │ { refreshToken: "uuid..." } │               │
     │─────────────►│              │               │
     │              │              │               │
@@ -844,11 +844,11 @@ t=30m:  Client sends RefreshToken_B
 
 | Route ID | Path Pattern | Target Service | Filters Applied |
 |----------|-------------|----------------|-----------------|
-| identity-public | /api/v1/auth/** | identity-service | RequestLogging, RateLimit |
-| identity-secured | /api/v1/users/** | identity-service | All filters |
-| merchant-api | /api/v1/merchants/** | merchant-service | All filters |
-| payment-api | /api/v1/payments/** | payment-service | All filters |
-| payment-sdk | /api/v1/sdk/** | payment-service | RequestLogging, RateLimit, ApiKey |
+| identity-public | /v1/auth/** | identity-service | RequestLogging, RateLimit |
+| identity-secured | /v1/users/** | identity-service | All filters |
+| merchant-api | /v1/merchants/** | merchant-service | All filters |
+| payment-api | /v1/payments/** | payment-service | All filters |
+| payment-sdk | /v1/sdk/** | payment-service | RequestLogging, RateLimit, ApiKey |
 
 ---
 

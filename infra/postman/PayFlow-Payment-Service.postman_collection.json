@@ -67,9 +67,9 @@
               "raw": "{\n  \"amount\": 150000,\n  \"currency\": \"INR\",\n  \"description\": \"Order for premium subscription\",\n  \"customerEmail\": \"customer@example.com\",\n  \"customerName\": \"John Doe\",\n  \"metadata\": {\n    \"orderId\": \"ORD-2024-001\",\n    \"productName\": \"Premium Plan\"\n  },\n  \"returnUrl\": \"https://teststore.com/payment/success\",\n  \"cancelUrl\": \"https://teststore.com/payment/cancel\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/payments/orders",
+              "raw": "{{baseUrl}}/v1/payments/orders",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "payments", "orders"]
+              "path": ["v1", "payments", "orders"]
             }
           },
           "event": [
@@ -99,9 +99,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/payments/orders/{{orderId}}",
+              "raw": "{{baseUrl}}/v1/payments/orders/{{orderId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "payments", "orders", "{{orderId}}"]
+              "path": ["v1", "payments", "orders", "{{orderId}}"]
             }
           },
           "event": [
@@ -141,9 +141,9 @@
               "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"paymentMethod\": {\n    \"type\": \"CARD\",\n    \"card\": {\n      \"number\": \"4111111111111111\",\n      \"expiryMonth\": 12,\n      \"expiryYear\": 2026,\n      \"cvv\": \"123\",\n      \"holderName\": \"John Doe\"\n    }\n  },\n  \"captureMethod\": \"MANUAL\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/payments/authorize",
+              "raw": "{{baseUrl}}/v1/payments/authorize",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "payments", "authorize"]
+              "path": ["v1", "payments", "authorize"]
             }
           },
           "event": [
@@ -178,9 +178,9 @@
               "raw": "{\n  \"amount\": 150000\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}/capture",
+              "raw": "{{baseUrl}}/v1/payments/{{paymentId}}/capture",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "payments", "{{paymentId}}", "capture"]
+              "path": ["v1", "payments", "{{paymentId}}", "capture"]
             }
           },
           "event": [
@@ -213,9 +213,9 @@
               "raw": "{\n  \"amount\": 50000,\n  \"reason\": \"Customer requested partial refund\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}/refund",
+              "raw": "{{baseUrl}}/v1/payments/{{paymentId}}/refund",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "payments", "{{paymentId}}", "refund"]
+              "path": ["v1", "payments", "{{paymentId}}", "refund"]
             }
           },
           "event": [
@@ -250,9 +250,9 @@
               "raw": "{\n  \"reason\": \"Order cancelled before fulfillment\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}/void",
+              "raw": "{{baseUrl}}/v1/payments/{{paymentId}}/void",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "payments", "{{paymentId}}", "void"]
+              "path": ["v1", "payments", "{{paymentId}}", "void"]
             }
           },
           "event": [

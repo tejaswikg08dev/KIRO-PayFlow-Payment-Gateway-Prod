@@ -123,6 +123,23 @@ npm install && npm run dev
 
 See the `/docs` folder for comprehensive documentation covering system design, architecture, coding guides, and deployment instructions.
 
+## API Routes (via Gateway :8080)
+
+| Path | Service | Example |
+|------|---------|---------|
+| `/v1/auth/**` | Identity Service | `POST /v1/auth/register` |
+| `/v1/merchants/**` | Merchant Service | `GET /v1/merchants/{id}` |
+| `/v1/orders/**` | Payment Service | `POST /v1/orders` |
+| `/v1/payments/**` | Payment Service | `POST /v1/payments/authorize` |
+| `/v1/refunds/**` | Payment Service | `POST /v1/refunds` |
+| `/v1/settlements/**` | Settlement Service | `GET /v1/settlements` |
+
+## Eureka Service Discovery
+
+All services register with Eureka using IP-based addressing (`prefer-ip-address: true`) and a standardized instance ID (`service-name:port`).
+
+Dashboard: http://localhost:8761
+
 ## License
 
 MIT

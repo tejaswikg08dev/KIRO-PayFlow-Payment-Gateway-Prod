@@ -8,19 +8,19 @@ export const settlementService = {
     size: number = 20
   ): Promise<PaginatedResponse<Settlement>> {
     const response = await apiClient.get<PaginatedResponse<Settlement>>(
-      '/api/settlements',
+      '/v1/settlements',
       { params: { page, size } }
     );
     return response.data;
   },
 
   async getSettlement(id: string): Promise<Settlement> {
-    const response = await apiClient.get<Settlement>(`/api/settlements/${id}`);
+    const response = await apiClient.get<Settlement>(`/v1/settlements/${id}`);
     return response.data;
   },
 
   async getPayouts(): Promise<Settlement[]> {
-    const response = await apiClient.get<Settlement[]>('/api/settlements/payouts');
+    const response = await apiClient.get<Settlement[]>('/v1/settlements/payouts');
     return response.data;
   },
 };

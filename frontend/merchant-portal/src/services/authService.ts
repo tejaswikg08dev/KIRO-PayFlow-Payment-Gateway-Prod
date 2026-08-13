@@ -4,7 +4,7 @@ import { TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY } from '@/utils/constants';
 
 export const authService = {
   async login(data: LoginRequest): Promise<AuthResponse> {
-    const response = await apiClient.post<AuthResponse>('/api/auth/login', data);
+    const response = await apiClient.post<AuthResponse>('/v1/auth/login', data);
     const authData = response.data;
     localStorage.setItem(TOKEN_KEY, authData.accessToken);
     localStorage.setItem(REFRESH_TOKEN_KEY, authData.refreshToken);
@@ -13,7 +13,7 @@ export const authService = {
   },
 
   async register(data: RegisterRequest): Promise<AuthResponse> {
-    const response = await apiClient.post<AuthResponse>('/api/auth/register', data);
+    const response = await apiClient.post<AuthResponse>('/v1/auth/register', data);
     const authData = response.data;
     localStorage.setItem(TOKEN_KEY, authData.accessToken);
     localStorage.setItem(REFRESH_TOKEN_KEY, authData.refreshToken);
@@ -23,7 +23,7 @@ export const authService = {
 
   async refreshToken(): Promise<AuthResponse> {
     const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-    const response = await apiClient.post<AuthResponse>('/api/auth/refresh', {
+    const response = await apiClient.post<AuthResponse>('/v1/auth/refresh', {
       refreshToken,
     });
     const authData = response.data;

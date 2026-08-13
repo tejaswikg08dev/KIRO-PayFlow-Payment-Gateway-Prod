@@ -51,7 +51,7 @@ public class FeeCalculationProcessor implements ItemProcessor<Map<String, Object
                 merchantId, grossAmount, refundAmount, mdrAmount, gstAmount, netAmount);
 
         return SettlementRecord.builder()
-                .id(IdGenerator.generate())
+                .id(IdGenerator.generateSettlementId())
                 .merchantId(merchantId)
                 .grossAmount(grossAmount)
                 .refundAmount(refundAmount)

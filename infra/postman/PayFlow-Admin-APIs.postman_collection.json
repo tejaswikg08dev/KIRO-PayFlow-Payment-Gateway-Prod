@@ -24,7 +24,7 @@
           "// Auto-login as admin",
           "if (!pm.collectionVariables.get('accessToken')) {",
           "    pm.sendRequest({",
-          "        url: pm.environment.get('baseUrl') + '/api/v1/auth/login',",
+          "        url: pm.environment.get('baseUrl') + '/v1/auth/login',",
           "        method: 'POST',",
           "        header: { 'Content-Type': 'application/json' },",
           "        body: { mode: 'raw', raw: JSON.stringify({ email: 'admin@payflow.dev', password: 'Admin@123456' }) }",
@@ -54,9 +54,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/admin/merchants?page=0&size=20&status=ACTIVE",
+              "raw": "{{baseUrl}}/v1/admin/merchants?page=0&size=20&status=ACTIVE",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "merchants"],
+              "path": ["v1", "admin", "merchants"],
               "query": [
                 { "key": "page", "value": "0" },
                 { "key": "size", "value": "20" },
@@ -89,9 +89,9 @@
               "raw": "{\n  \"status\": \"APPROVED\",\n  \"remarks\": \"KYC verified, approved for live transactions\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/admin/merchants/{{merchantId}}/status",
+              "raw": "{{baseUrl}}/v1/admin/merchants/{{merchantId}}/status",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "merchants", "{{merchantId}}", "status"]
+              "path": ["v1", "admin", "merchants", "{{merchantId}}", "status"]
             }
           },
           "event": [
@@ -119,9 +119,9 @@
               "raw": "{\n  \"status\": \"SUSPENDED\",\n  \"remarks\": \"Suspicious activity detected\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/admin/merchants/{{merchantId}}/status",
+              "raw": "{{baseUrl}}/v1/admin/merchants/{{merchantId}}/status",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "merchants", "{{merchantId}}", "status"]
+              "path": ["v1", "admin", "merchants", "{{merchantId}}", "status"]
             }
           },
           "event": [
@@ -148,9 +148,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/admin/users?page=0&size=20",
+              "raw": "{{baseUrl}}/v1/admin/users?page=0&size=20",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "users"],
+              "path": ["v1", "admin", "users"],
               "query": [
                 { "key": "page", "value": "0" },
                 { "key": "size", "value": "20" }
@@ -176,9 +176,9 @@
             "method": "PUT",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/admin/users/{{userId}}/disable",
+              "raw": "{{baseUrl}}/v1/admin/users/{{userId}}/disable",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "users", "{{userId}}", "disable"]
+              "path": ["v1", "admin", "users", "{{userId}}", "disable"]
             }
           },
           "event": [
@@ -205,9 +205,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/admin/dashboard/stats",
+              "raw": "{{baseUrl}}/v1/admin/dashboard/stats",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "dashboard", "stats"]
+              "path": ["v1", "admin", "dashboard", "stats"]
             }
           },
           "event": [
@@ -236,9 +236,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/admin/transactions?fromDate=2024-01-01&toDate=2024-12-31&page=0&size=20",
+              "raw": "{{baseUrl}}/v1/admin/transactions?fromDate=2024-01-01&toDate=2024-12-31&page=0&size=20",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "admin", "transactions"],
+              "path": ["v1", "admin", "transactions"],
               "query": [
                 { "key": "fromDate", "value": "2024-01-01" },
                 { "key": "toDate", "value": "2024-12-31" },

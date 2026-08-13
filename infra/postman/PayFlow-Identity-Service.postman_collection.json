@@ -27,7 +27,7 @@
           "    const refreshToken = pm.collectionVariables.get('refreshToken');",
           "    if (refreshToken) {",
           "        pm.sendRequest({",
-          "            url: pm.environment.get('baseUrl') + '/api/v1/auth/refresh',",
+          "            url: pm.environment.get('baseUrl') + '/v1/auth/refresh',",
           "            method: 'POST',",
           "            header: { 'Content-Type': 'application/json' },",
           "            body: { mode: 'raw', raw: JSON.stringify({ refreshToken }) }",
@@ -67,9 +67,9 @@
               "raw": "{\n  \"email\": \"testuser@payflow.dev\",\n  \"password\": \"Test@123456\",\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"role\": \"MERCHANT\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "raw": "{{baseUrl}}/v1/auth/register",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "register"]
+              "path": ["v1", "auth", "register"]
             }
           },
           "event": [
@@ -103,9 +103,9 @@
               "raw": "{\n  \"email\": \"testuser@payflow.dev\",\n  \"password\": \"Test@123456\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "raw": "{{baseUrl}}/v1/auth/login",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "login"]
+              "path": ["v1", "auth", "login"]
             }
           },
           "event": [
@@ -142,9 +142,9 @@
               "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "raw": "{{baseUrl}}/v1/auth/refresh",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "refresh"]
+              "path": ["v1", "auth", "refresh"]
             }
           },
           "event": [
@@ -173,9 +173,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/profile",
+              "raw": "{{baseUrl}}/v1/auth/profile",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "profile"]
+              "path": ["v1", "auth", "profile"]
             }
           },
           "event": [

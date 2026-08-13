@@ -169,12 +169,12 @@ ports:
 
 ```bash
 # Get a new token
-curl -X POST http://localhost:8080/api/v1/auth/login \
+curl -X POST http://localhost:8080/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"your@email.com","password":"password"}'
 
 # Or use refresh token
-curl -X POST http://localhost:8080/api/v1/auth/refresh \
+curl -X POST http://localhost:8080/v1/auth/refresh \
   -H "Content-Type: application/json" \
   -d '{"refreshToken":"your-refresh-token"}'
 ```
@@ -200,7 +200,7 @@ docker exec payflow-gateway env | grep JWT_SECRET
 ```bash
 # Verify key format (should start with pk_live_ or pk_test_)
 # Verify key hasn't been revoked
-curl http://localhost:8080/api/v1/merchants/api-keys \
+curl http://localhost:8080/v1/merchants/api-keys \
   -H "Authorization: Bearer $TOKEN"
 
 # Check if key lookup is working
@@ -219,7 +219,7 @@ This means you sent the same `X-Idempotency-Key` with a different request body.
 
 ```bash
 # Fix: Use a unique key for each unique request
-curl -X POST http://localhost:8080/api/v1/payments/orders \
+curl -X POST http://localhost:8080/v1/payments/orders \
   -H "X-Idempotency-Key: unique-$(uuidgen)" \
   ...
 ```
@@ -238,13 +238,13 @@ CAPTURED → REFUNDED (full or partial)
 
 ```bash
 # Check current order status
-curl http://localhost:8080/api/v1/payments/orders/ORD_xxx \
+curl http://localhost:8080/v1/payments/orders/ORD_xxx \
   -H "Authorization: Bearer $TOKEN" | jq '.status'
 
 # Must authorize BEFORE capture
-curl -X POST http://localhost:8080/api/v1/payments/orders/ORD_xxx/authorize ...
+curl -X POST http://localhost:8080/v1/payments/orders/ORD_xxx/authorize ...
 # Then capture
-curl -X POST http://localhost:8080/api/v1/payments/orders/ORD_xxx/capture ...
+curl -X POST http://localhost:8080/v1/payments/orders/ORD_xxx/capture ...
 ```
 
 ### Bank Declined

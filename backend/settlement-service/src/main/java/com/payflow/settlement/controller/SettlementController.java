@@ -51,7 +51,6 @@ public class SettlementController {
 
         return ResponseEntity.ok(ApiResponse.<SettlementBatchResponse>builder()
                 .success(true)
-                .message("Settlement batch triggered successfully")
                 .data(response)
                 .build());
     }
@@ -66,7 +65,6 @@ public class SettlementController {
 
         return ResponseEntity.ok(ApiResponse.<List<SettlementBatchResponse>>builder()
                 .success(true)
-                .message("Settlement batches retrieved")
                 .data(responses)
                 .build());
     }
@@ -79,7 +77,6 @@ public class SettlementController {
 
         return ResponseEntity.ok(ApiResponse.<SettlementBatchResponse>builder()
                 .success(true)
-                .message("Settlement batch retrieved")
                 .data(mapBatchToResponse(batch))
                 .build());
     }
@@ -99,7 +96,6 @@ public class SettlementController {
 
         return ResponseEntity.ok(ApiResponse.<List<PayoutResponse>>builder()
                 .success(true)
-                .message("Payouts retrieved")
                 .data(responses)
                 .build());
     }

@@ -54,11 +54,11 @@ export function ApiKeysPage() {
 
   const { data: keys, isLoading } = useQuery({
     queryKey: ['api-keys'],
-    queryFn: () => apiClient.get('/api/v1/merchants/api-keys'),
+    queryFn: () => apiClient.get('/v1/merchants/api-keys'),
   });
 
   const generateMutation = useMutation({
-    mutationFn: (name: string) => apiClient.post('/api/v1/merchants/api-keys', { name }),
+    mutationFn: (name: string) => apiClient.post('/v1/merchants/api-keys', { name }),
     onSuccess: (data) => {
       setNewKey(data.key); // Show full key ONCE
       queryClient.invalidateQueries(['api-keys']);
@@ -68,7 +68,7 @@ export function ApiKeysPage() {
   });
 
   const revokeMutation = useMutation({
-    mutationFn: (keyId: string) => apiClient.delete(`/api/v1/merchants/api-keys/${keyId}`),
+    mutationFn: (keyId: string) => apiClient.delete(`/v1/merchants/api-keys/${keyId}`),
     onSuccess: () => {
       queryClient.invalidateQueries(['api-keys']);
       toast.success('API key revoked');
@@ -159,7 +159,7 @@ export function WebhooksPage() {
   ];
 
   const createMutation = useMutation({
-    mutationFn: (payload) => apiClient.post('/api/v1/merchants/webhooks', payload),
+    mutationFn: (payload) => apiClient.post('/v1/merchants/webhooks', payload),
     onSuccess: () => {
       queryClient.invalidateQueries(['webhooks']);
       toast.success('Webhook endpoint added');
@@ -212,7 +212,7 @@ export function WebhookLogs() {
   const { webhookId } = useParams();
   const { data: logs } = useQuery({
     queryKey: ['webhook-logs', webhookId],
-    queryFn: () => apiClient.get(`/api/v1/merchants/webhooks/${webhookId}/deliveries`),
+    queryFn: () => apiClient.get(`/v1/merchants/webhooks/${webhookId}/deliveries`),
   });
 
   return (
@@ -250,7 +250,7 @@ export function SettingsPage() {
   const { data: merchant } = useQuery({ queryKey: ['merchant-profile'], queryFn: fetchProfile });
 
   const updateMutation = useMutation({
-    mutationFn: (data) => apiClient.put('/api/v1/merchants/profile', data),
+    mutationFn: (data) => apiClient.put('/v1/merchants/profile', data),
     onSuccess: () => {
       queryClient.invalidateQueries(['merchant-profile']);
       toast.success('Settings saved successfully');

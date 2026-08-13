@@ -293,7 +293,7 @@ export function useTransactions(filters: TransactionFilters) {
     // WHY: queryFn is the actual API call
     queryFn: async () => {
       const response = await apiClient.get<PaginatedResponse<Transaction>>(
-        '/api/v1/payments',
+        '/v1/payments',
         { params: filters }
       );
       return response.data;
@@ -307,7 +307,7 @@ export function useTransaction(id: string) {
   return useQuery({
     queryKey: transactionKeys.detail(id),
     queryFn: async () => {
-      const response = await apiClient.get<Transaction>(`/api/v1/payments/${id}`);
+      const response = await apiClient.get<Transaction>(`/v1/payments/${id}`);
       return response.data;
     },
     // WHY: Only fetch if we have an ID (prevents fetch with undefined)
@@ -320,7 +320,7 @@ export function useRefundTransaction() {
 
   return useMutation({
     mutationFn: async ({ paymentId, amount }: { paymentId: string; amount: number }) => {
-      const response = await apiClient.post(`/api/v1/payments/${paymentId}/refund`, { amount });
+      const response = await apiClient.post(`/v1/payments/${paymentId}/refund`, { amount });
       return response.data;
     },
     onSuccess: (_, variables) => {
@@ -422,7 +422,7 @@ apiClient.interceptors.response.use(
         // WHY: Use refresh token to get new access token
         const refreshToken = localStorage.getItem('refreshToken');
         const response = await axios.post(
-          `${import.meta.env.VITE_API_URL}/api/v1/auth/refresh`,
+          `${import.meta.env.VITE_API_URL}/v1/auth/refresh`,
           { refreshToken }
         );
 
@@ -508,7 +508,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           // WHY: Validate token by fetching user profile
           // If token expired, interceptor will try to refresh it
-          const response = await apiClient.get<User>('/api/v1/auth/me');
+          const response = await apiClient.get<User>('/v1/auth/me');
           setUser(response.data);
         } catch {
           // WHY: Token invalid and refresh failed → clear everything
@@ -524,7 +524,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     // WHY: Call auth endpoint, receive JWT tokens + user info
-    const response = await apiClient.post('/api/v1/auth/login', { email, password });
+    const response = await apiClient.post('/v1/auth/login', { email, password });
 
     const { accessToken, refreshToken, user: userData } = response.data;
 

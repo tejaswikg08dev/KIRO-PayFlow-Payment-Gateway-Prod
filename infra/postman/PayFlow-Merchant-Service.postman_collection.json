@@ -24,7 +24,7 @@
           "// Auto-login if no token",
           "if (!pm.collectionVariables.get('accessToken')) {",
           "    pm.sendRequest({",
-          "        url: pm.environment.get('baseUrl') + '/api/v1/auth/login',",
+          "        url: pm.environment.get('baseUrl') + '/v1/auth/login',",
           "        method: 'POST',",
           "        header: { 'Content-Type': 'application/json' },",
           "        body: { mode: 'raw', raw: JSON.stringify({ email: 'merchant@testshop.com', password: 'Merchant@123456' }) }",
@@ -61,9 +61,9 @@
               "raw": "{\n  \"businessName\": \"Test Store\",\n  \"businessType\": \"E_COMMERCE\",\n  \"registrationNumber\": \"REG-TEST-001\",\n  \"country\": \"IN\",\n  \"currency\": \"INR\",\n  \"website\": \"https://teststore.com\",\n  \"callbackUrl\": \"https://teststore.com/webhooks\",\n  \"contactEmail\": \"payments@teststore.com\",\n  \"contactPhone\": \"+919876543210\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/merchants",
+              "raw": "{{baseUrl}}/v1/merchants",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "merchants"]
+              "path": ["v1", "merchants"]
             }
           },
           "event": [
@@ -91,9 +91,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/merchants/{{merchantId}}",
+              "raw": "{{baseUrl}}/v1/merchants/{{merchantId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "merchants", "{{merchantId}}"]
+              "path": ["v1", "merchants", "{{merchantId}}"]
             }
           },
           "event": [
@@ -121,9 +121,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/merchants?page=0&size=10",
+              "raw": "{{baseUrl}}/v1/merchants?page=0&size=10",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "merchants"],
+              "path": ["v1", "merchants"],
               "query": [
                 { "key": "page", "value": "0" },
                 { "key": "size", "value": "10" }
@@ -166,9 +166,9 @@
               "raw": "{\n  \"name\": \"Production Key\",\n  \"environment\": \"LIVE\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/merchants/{{merchantId}}/api-keys",
+              "raw": "{{baseUrl}}/v1/merchants/{{merchantId}}/api-keys",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "merchants", "{{merchantId}}", "api-keys"]
+              "path": ["v1", "merchants", "{{merchantId}}", "api-keys"]
             }
           },
           "event": [
@@ -197,9 +197,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/merchants/{{merchantId}}/api-keys",
+              "raw": "{{baseUrl}}/v1/merchants/{{merchantId}}/api-keys",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "merchants", "{{merchantId}}", "api-keys"]
+              "path": ["v1", "merchants", "{{merchantId}}", "api-keys"]
             }
           },
           "event": [
@@ -221,9 +221,9 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/merchants/{{merchantId}}/api-keys/{{apiKeyId}}",
+              "raw": "{{baseUrl}}/v1/merchants/{{merchantId}}/api-keys/{{apiKeyId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "merchants", "{{merchantId}}", "api-keys", "{{apiKeyId}}"]
+              "path": ["v1", "merchants", "{{merchantId}}", "api-keys", "{{apiKeyId}}"]
             }
           },
           "event": [
@@ -256,9 +256,9 @@
               "raw": "{\n  \"url\": \"https://teststore.com/webhooks/payflow\",\n  \"events\": [\"payment.captured\", \"payment.refunded\", \"settlement.completed\"],\n  \"secret\": \"whsec_testSecret123\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/merchants/{{merchantId}}/webhooks",
+              "raw": "{{baseUrl}}/v1/merchants/{{merchantId}}/webhooks",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "merchants", "{{merchantId}}", "webhooks"]
+              "path": ["v1", "merchants", "{{merchantId}}", "webhooks"]
             }
           },
           "event": [
@@ -286,9 +286,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/merchants/{{merchantId}}/webhooks",
+              "raw": "{{baseUrl}}/v1/merchants/{{merchantId}}/webhooks",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "merchants", "{{merchantId}}", "webhooks"]
+              "path": ["v1", "merchants", "{{merchantId}}", "webhooks"]
             }
           },
           "event": [

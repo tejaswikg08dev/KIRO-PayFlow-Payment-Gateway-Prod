@@ -7,7 +7,7 @@
 | **Version** | v1.0.0 |
 | **Previous** | [Phase 9 — Monitoring](phase9-monitoring-observability.md) |
 | **Next** | [Database Guide](database-guide.md) |
-| **Base URL** | `http://localhost:8080/api/v1` (local) / `https://api.payflow.example.com/api/v1` (prod) |
+| **Base URL** | `http://localhost:8080/v1` (local) / `https://api.payflow.example.com/v1` (prod) |
 | **Prerequisites** | Running PayFlow services |
 
 ---
@@ -56,12 +56,12 @@ Register → Login → Get JWT (24h TTL) → Use in requests → Refresh when ex
 
 ## 2. Identity Service Endpoints
 
-### POST /api/v1/auth/register
+### POST /v1/auth/register
 
 Register a new merchant account.
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/register \
+curl -X POST http://localhost:8080/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "email": "merchant@example.com",
@@ -82,12 +82,12 @@ curl -X POST http://localhost:8080/api/v1/auth/register \
 }
 ```
 
-### POST /api/v1/auth/login
+### POST /v1/auth/login
 
 Authenticate and receive JWT token.
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/login \
+curl -X POST http://localhost:8080/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "merchant@example.com",
@@ -105,22 +105,22 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
 }
 ```
 
-### POST /api/v1/auth/refresh
+### POST /v1/auth/refresh
 
 Refresh an expired access token.
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/refresh \
+curl -X POST http://localhost:8080/v1/auth/refresh \
   -H "Content-Type: application/json" \
   -d '{"refreshToken": "eyJhbGciOiJIUzI1NiIs..."}'
 ```
 
-### POST /api/v1/auth/logout
+### POST /v1/auth/logout
 
 Invalidate current token.
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/logout \
+curl -X POST http://localhost:8080/v1/auth/logout \
   -H "Authorization: Bearer eyJhbG..."
 ```
 
@@ -128,12 +128,12 @@ curl -X POST http://localhost:8080/api/v1/auth/logout \
 
 ## 3. Merchant Service Endpoints
 
-### GET /api/v1/merchants/profile
+### GET /v1/merchants/profile
 
 Get current merchant's profile.
 
 ```bash
-curl http://localhost:8080/api/v1/merchants/profile \
+curl http://localhost:8080/v1/merchants/profile \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -152,12 +152,12 @@ curl http://localhost:8080/api/v1/merchants/profile \
 }
 ```
 
-### PUT /api/v1/merchants/profile
+### PUT /v1/merchants/profile
 
 Update merchant profile.
 
 ```bash
-curl -X PUT http://localhost:8080/api/v1/merchants/profile \
+curl -X PUT http://localhost:8080/v1/merchants/profile \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -166,12 +166,12 @@ curl -X PUT http://localhost:8080/api/v1/merchants/profile \
   }'
 ```
 
-### POST /api/v1/merchants/api-keys
+### POST /v1/merchants/api-keys
 
 Generate a new API key.
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/merchants/api-keys \
+curl -X POST http://localhost:8080/v1/merchants/api-keys \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name": "Production Key"}'
@@ -190,21 +190,21 @@ curl -X POST http://localhost:8080/api/v1/merchants/api-keys \
 
 > ⚠️ The full `key` is shown ONLY in this response. Save it immediately.
 
-### GET /api/v1/merchants/api-keys
+### GET /v1/merchants/api-keys
 
 List all API keys (masked).
 
 ```bash
-curl http://localhost:8080/api/v1/merchants/api-keys \
+curl http://localhost:8080/v1/merchants/api-keys \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-### DELETE /api/v1/merchants/api-keys/{keyId}
+### DELETE /v1/merchants/api-keys/{keyId}
 
 Revoke an API key.
 
 ```bash
-curl -X DELETE http://localhost:8080/api/v1/merchants/api-keys/key-uuid-001 \
+curl -X DELETE http://localhost:8080/v1/merchants/api-keys/key-uuid-001 \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -212,12 +212,12 @@ curl -X DELETE http://localhost:8080/api/v1/merchants/api-keys/key-uuid-001 \
 
 ## 4. Payment Service Endpoints
 
-### POST /api/v1/payments/orders
+### POST /v1/payments/orders
 
 Create a new payment order.
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/payments/orders \
+curl -X POST http://localhost:8080/v1/payments/orders \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -H "X-Idempotency-Key: unique-key-$(date +%s)" \
@@ -248,12 +248,12 @@ curl -X POST http://localhost:8080/api/v1/payments/orders \
 }
 ```
 
-### POST /api/v1/payments/orders/{orderId}/authorize
+### POST /v1/payments/orders/{orderId}/authorize
 
 Authorize payment with a payment method.
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/payments/orders/ORD_abc123def456/authorize \
+curl -X POST http://localhost:8080/v1/payments/orders/ORD_abc123def456/authorize \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -280,12 +280,12 @@ curl -X POST http://localhost:8080/api/v1/payments/orders/ORD_abc123def456/autho
 }
 ```
 
-### POST /api/v1/payments/orders/{orderId}/capture
+### POST /v1/payments/orders/{orderId}/capture
 
 Capture an authorized payment.
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/payments/orders/ORD_abc123def456/capture \
+curl -X POST http://localhost:8080/v1/payments/orders/ORD_abc123def456/capture \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"amount": 15000}'
@@ -302,12 +302,12 @@ curl -X POST http://localhost:8080/api/v1/payments/orders/ORD_abc123def456/captu
 }
 ```
 
-### POST /api/v1/payments/orders/{orderId}/refund
+### POST /v1/payments/orders/{orderId}/refund
 
 Refund a captured payment (full or partial).
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/payments/orders/ORD_abc123def456/refund \
+curl -X POST http://localhost:8080/v1/payments/orders/ORD_abc123def456/refund \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -328,21 +328,21 @@ curl -X POST http://localhost:8080/api/v1/payments/orders/ORD_abc123def456/refun
 }
 ```
 
-### GET /api/v1/payments/orders/{orderId}
+### GET /v1/payments/orders/{orderId}
 
 Get order details.
 
 ```bash
-curl http://localhost:8080/api/v1/payments/orders/ORD_abc123def456 \
+curl http://localhost:8080/v1/payments/orders/ORD_abc123def456 \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-### GET /api/v1/payments/transactions
+### GET /v1/payments/transactions
 
 List transactions with filters.
 
 ```bash
-curl "http://localhost:8080/api/v1/payments/transactions?status=CAPTURED&page=0&size=20&from=2024-01-01&to=2024-01-31" \
+curl "http://localhost:8080/v1/payments/transactions?status=CAPTURED&page=0&size=20&from=2024-01-01&to=2024-01-31" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -350,12 +350,12 @@ curl "http://localhost:8080/api/v1/payments/transactions?status=CAPTURED&page=0&
 
 ## 5. Settlement Service Endpoints
 
-### GET /api/v1/settlements
+### GET /v1/settlements
 
 List settlements.
 
 ```bash
-curl http://localhost:8080/api/v1/settlements \
+curl http://localhost:8080/v1/settlements \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -378,12 +378,12 @@ curl http://localhost:8080/api/v1/settlements \
 }
 ```
 
-### GET /api/v1/settlements/{id}
+### GET /v1/settlements/{id}
 
 Get settlement details with included transactions.
 
 ```bash
-curl http://localhost:8080/api/v1/settlements/settlement-uuid-001 \
+curl http://localhost:8080/v1/settlements/settlement-uuid-001 \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -399,7 +399,7 @@ All errors follow a consistent format:
   "message": "The payment was declined by the issuing bank",
   "status": 422,
   "timestamp": "2024-01-15T10:30:00Z",
-  "path": "/api/v1/payments/orders/ORD_abc123/authorize",
+  "path": "/v1/payments/orders/ORD_abc123/authorize",
   "correlationId": "corr-uuid-001"
 }
 ```

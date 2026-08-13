@@ -20,19 +20,19 @@ export const paymentService = {
     if (filter.search) params.append('search', filter.search);
 
     const response = await apiClient.get<PaginatedResponse<Payment>>(
-      `/api/payments?${params.toString()}`
+      `/v1/payments?${params.toString()}`
     );
     return response.data;
   },
 
   async getTransaction(id: string): Promise<Transaction> {
-    const response = await apiClient.get<Transaction>(`/api/payments/${id}`);
+    const response = await apiClient.get<Transaction>(`/v1/payments/${id}`);
     return response.data;
   },
 
   async refundPayment(data: RefundRequest): Promise<Refund> {
     const response = await apiClient.post<Refund>(
-      `/api/payments/${data.paymentId}/refund`,
+      `/v1/payments/${data.paymentId}/refund`,
       {
         amount: data.amount,
         reason: data.reason,

@@ -11,6 +11,9 @@ eureka:
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
 
 jwt:
   secret: payflow-jwt-secret-key-must-be-at-least-256-bits-long-for-hmac-sha256

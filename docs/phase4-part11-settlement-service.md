@@ -645,7 +645,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/v1/settlements")
+@RequestMapping("/v1/settlements")
 @RequiredArgsConstructor
 public class SettlementController {
 
@@ -653,7 +653,7 @@ public class SettlementController {
     private final SettlementBatchRepository batchRepository;
 
     /**
-     * POST /api/v1/settlements/trigger — Manually trigger settlement
+     * POST /v1/settlements/trigger — Manually trigger settlement
      *
      * WHY manual trigger: Operations team needs to re-run settlement
      * if the scheduled run failed or if they need to process a specific day.
@@ -676,7 +676,7 @@ public class SettlementController {
     }
 
     /**
-     * GET /api/v1/settlements/batches — List all settlement batches
+     * GET /v1/settlements/batches — List all settlement batches
      *
      * WHY: Operations dashboard shows settlement history, status, amounts
      */
@@ -692,7 +692,7 @@ public class SettlementController {
     }
 
     /**
-     * GET /api/v1/settlements/batches/{id} — Get batch details
+     * GET /v1/settlements/batches/{id} — Get batch details
      */
     @GetMapping("/batches/{batchId}")
     public ResponseEntity<SettlementBatch> getBatch(@PathVariable String batchId) {
@@ -702,7 +702,7 @@ public class SettlementController {
     }
 
     /**
-     * GET /api/v1/settlements/merchant/{merchantId} — Merchant's settlement history
+     * GET /v1/settlements/merchant/{merchantId} — Merchant's settlement history
      */
     @GetMapping("/merchant/{merchantId}")
     public ResponseEntity<List<SettlementBatch>> merchantSettlements(

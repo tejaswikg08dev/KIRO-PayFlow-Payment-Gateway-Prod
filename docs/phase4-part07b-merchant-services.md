@@ -427,7 +427,7 @@ import java.util.UUID;
  * - X-User-Role header: for role-based access control
  */
 @RestController
-@RequestMapping("/api/v1/merchants")
+@RequestMapping("/v1/merchants")
 public class MerchantController {
 
     private final MerchantService merchantService;
@@ -440,7 +440,7 @@ public class MerchantController {
      * Create (onboard) a new merchant.
      * Only users with MERCHANT role can create merchant profiles.
      * 
-     * POST /api/v1/merchants
+     * POST /v1/merchants
      */
     @PostMapping
     public ResponseEntity<MerchantResponse> createMerchant(
@@ -453,7 +453,7 @@ public class MerchantController {
     /**
      * Get merchant by ID (admin or own merchant).
      * 
-     * GET /api/v1/merchants/{merchantId}
+     * GET /v1/merchants/{merchantId}
      */
     @GetMapping("/{merchantId}")
     public ResponseEntity<MerchantResponse> getMerchant(@PathVariable UUID merchantId) {
@@ -464,7 +464,7 @@ public class MerchantController {
     /**
      * Get merchant profile for current user.
      * 
-     * GET /api/v1/merchants/me
+     * GET /v1/merchants/me
      */
     @GetMapping("/me")
     public ResponseEntity<MerchantResponse> getMyMerchant(
@@ -476,7 +476,7 @@ public class MerchantController {
     /**
      * Update merchant details.
      * 
-     * PATCH /api/v1/merchants/{merchantId}
+     * PATCH /v1/merchants/{merchantId}
      */
     @PatchMapping("/{merchantId}")
     public ResponseEntity<MerchantResponse> updateMerchant(
@@ -489,7 +489,7 @@ public class MerchantController {
     /**
      * Activate a merchant (admin only, after KYC verification).
      * 
-     * POST /api/v1/merchants/{merchantId}/activate
+     * POST /v1/merchants/{merchantId}/activate
      */
     @PostMapping("/{merchantId}/activate")
     public ResponseEntity<MerchantResponse> activateMerchant(
@@ -528,7 +528,7 @@ import java.util.UUID;
  * All subsequent operations show only the prefix (masked).
  */
 @RestController
-@RequestMapping("/api/v1/merchants/{merchantId}/api-keys")
+@RequestMapping("/v1/merchants/{merchantId}/api-keys")
 public class ApiKeyController {
 
     private final ApiKeyService apiKeyService;
@@ -541,7 +541,7 @@ public class ApiKeyController {
      * Generate a new API key for the merchant.
      * Returns the raw key ONCE — merchant must save it immediately.
      * 
-     * POST /api/v1/merchants/{merchantId}/api-keys
+     * POST /v1/merchants/{merchantId}/api-keys
      */
     @PostMapping
     public ResponseEntity<ApiKeyCreatedResponse> generateApiKey(
@@ -556,7 +556,7 @@ public class ApiKeyController {
     /**
      * List all API keys for a merchant (masked, no raw values).
      * 
-     * GET /api/v1/merchants/{merchantId}/api-keys
+     * GET /v1/merchants/{merchantId}/api-keys
      */
     @GetMapping
     public ResponseEntity<List<ApiKeyResponse>> listApiKeys(
@@ -568,7 +568,7 @@ public class ApiKeyController {
     /**
      * Revoke an API key. Cannot be undone.
      * 
-     * DELETE /api/v1/merchants/{merchantId}/api-keys/{keyId}
+     * DELETE /v1/merchants/{merchantId}/api-keys/{keyId}
      */
     @DeleteMapping("/{keyId}")
     public ResponseEntity<Void> revokeApiKey(

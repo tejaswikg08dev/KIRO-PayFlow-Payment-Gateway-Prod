@@ -7,13 +7,13 @@ import {
 
 export const webhookService = {
   async getWebhooks(): Promise<WebhookConfig[]> {
-    const response = await apiClient.get<WebhookConfig[]>('/api/merchants/webhooks');
+    const response = await apiClient.get<WebhookConfig[]>('/v1/merchants/webhooks');
     return response.data;
   },
 
   async configureWebhook(data: WebhookCreateRequest): Promise<WebhookConfig> {
     const response = await apiClient.post<WebhookConfig>(
-      '/api/merchants/webhooks',
+      '/v1/merchants/webhooks',
       data
     );
     return response.data;
@@ -21,26 +21,26 @@ export const webhookService = {
 
   async updateWebhook(id: string, data: Partial<WebhookCreateRequest>): Promise<WebhookConfig> {
     const response = await apiClient.put<WebhookConfig>(
-      `/api/merchants/webhooks/${id}`,
+      `/v1/merchants/webhooks/${id}`,
       data
     );
     return response.data;
   },
 
   async deleteWebhook(id: string): Promise<void> {
-    await apiClient.delete(`/api/merchants/webhooks/${id}`);
+    await apiClient.delete(`/v1/merchants/webhooks/${id}`);
   },
 
   async getDeliveryLogs(webhookId: string): Promise<WebhookDeliveryLog[]> {
     const response = await apiClient.get<WebhookDeliveryLog[]>(
-      `/api/merchants/webhooks/${webhookId}/deliveries`
+      `/v1/merchants/webhooks/${webhookId}/deliveries`
     );
     return response.data;
   },
 
   async retryDelivery(webhookId: string, deliveryId: string): Promise<void> {
     await apiClient.post(
-      `/api/merchants/webhooks/${webhookId}/deliveries/${deliveryId}/retry`
+      `/v1/merchants/webhooks/${webhookId}/deliveries/${deliveryId}/retry`
     );
   },
 };

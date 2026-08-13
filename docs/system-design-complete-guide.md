@@ -328,9 +328,9 @@ RESTful API Design Principles Used:
 ───────────────────────────────────
 
 1. Resource-based URLs:
-   POST   /api/v1/orders              → Create order
-   GET    /api/v1/orders/{id}         → Get order
-   POST   /api/v1/payments/{id}/capture → Action on resource
+   POST   /v1/orders              → Create order
+   GET    /v1/orders/{id}         → Get order
+   POST   /v1/payments/{id}/capture → Action on resource
 
 2. Consistent response envelope:
    {
@@ -353,9 +353,9 @@ RESTful API Design Principles Used:
    }
 
 4. Pagination:
-   GET /api/v1/orders?page=0&size=20&sort=createdAt,desc
+   GET /v1/orders?page=0&size=20&sort=createdAt,desc
 
-5. Versioning: /api/v1/ prefix for all endpoints
+5. Versioning: /v1/ prefix for all endpoints
 ```
 
 ---

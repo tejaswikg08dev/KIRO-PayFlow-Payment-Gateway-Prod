@@ -3,19 +3,19 @@ import { ApiKey, ApiKeyCreateRequest, ApiKeyCreateResponse } from '@/types/merch
 
 export const apiKeyService = {
   async listKeys(): Promise<ApiKey[]> {
-    const response = await apiClient.get<ApiKey[]>('/api/merchants/api-keys');
+    const response = await apiClient.get<ApiKey[]>('/v1/merchants/api-keys');
     return response.data;
   },
 
   async generateKey(data: ApiKeyCreateRequest): Promise<ApiKeyCreateResponse> {
     const response = await apiClient.post<ApiKeyCreateResponse>(
-      '/api/merchants/api-keys',
+      '/v1/merchants/api-keys',
       data
     );
     return response.data;
   },
 
   async revokeKey(keyId: string): Promise<void> {
-    await apiClient.delete(`/api/merchants/api-keys/${keyId}`);
+    await apiClient.delete(`/v1/merchants/api-keys/${keyId}`);
   },
 };

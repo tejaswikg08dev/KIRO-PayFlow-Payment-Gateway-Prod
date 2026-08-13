@@ -374,7 +374,7 @@ import { apiClient } from '@/lib/apiClient';
 export function useTransactions(filters: TransactionFilters) {
   return useQuery({
     queryKey: ['transactions', filters],
-    queryFn: () => apiClient.get('/api/v1/payments/transactions', { params: filters }),
+    queryFn: () => apiClient.get('/v1/payments/transactions', { params: filters }),
     keepPreviousData: true,  // smooth pagination
     staleTime: 30_000,       // 30 seconds before refetch
   });
@@ -383,7 +383,7 @@ export function useTransactions(filters: TransactionFilters) {
 export function useTransaction(id: string) {
   return useQuery({
     queryKey: ['transaction', id],
-    queryFn: () => apiClient.get(`/api/v1/payments/transactions/${id}`),
+    queryFn: () => apiClient.get(`/v1/payments/transactions/${id}`),
     enabled: !!id,
   });
 }
@@ -392,7 +392,7 @@ export function useTransaction(id: string) {
 export function useAnalytics(type: 'dashboard-stats' | 'full') {
   return useQuery({
     queryKey: ['analytics', type],
-    queryFn: () => apiClient.get(`/api/v1/analytics/${type}`),
+    queryFn: () => apiClient.get(`/v1/analytics/${type}`),
     staleTime: 60_000,       // analytics data cached 1 minute
     refetchOnWindowFocus: false,
   });

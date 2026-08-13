@@ -12,13 +12,13 @@ const apiClient = axios.create({
 
 export const checkoutService = {
   async getOrderDetails(orderId: string): Promise<OrderDetails> {
-    const response = await apiClient.get<OrderDetails>(`/api/checkout/orders/${orderId}`);
+    const response = await apiClient.get<OrderDetails>(`/v1/orders/${orderId}`);
     return response.data;
   },
 
   async submitPayment(data: PaymentRequest): Promise<PaymentStatusResponse> {
     const response = await apiClient.post<PaymentStatusResponse>(
-      '/api/checkout/pay',
+      '/v1/payments/authorize',
       data
     );
     return response.data;
@@ -26,7 +26,7 @@ export const checkoutService = {
 
   async getPaymentStatus(paymentId: string): Promise<PaymentStatusResponse> {
     const response = await apiClient.get<PaymentStatusResponse>(
-      `/api/checkout/payments/${paymentId}/status`
+      `/v1/payments/${paymentId}`
     );
     return response.data;
   },

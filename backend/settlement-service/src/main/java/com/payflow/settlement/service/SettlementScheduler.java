@@ -67,7 +67,7 @@ public class SettlementScheduler {
 
         // Create batch record
         SettlementBatch batch = SettlementBatch.builder()
-                .id(IdGenerator.generate())
+                .id(IdGenerator.generateSettlementId())
                 .settlementDate(settlementDate)
                 .status(BatchStatus.PENDING)
                 .totalGross(BigDecimal.ZERO)

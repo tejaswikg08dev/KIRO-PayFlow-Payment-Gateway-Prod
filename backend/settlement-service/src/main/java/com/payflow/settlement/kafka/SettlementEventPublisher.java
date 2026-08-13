@@ -30,7 +30,7 @@ public class SettlementEventPublisher {
      */
     public void publishSettlementCompleted(SettlementBatch batch) {
         SettlementEvent event = SettlementEvent.builder()
-                .eventId(IdGenerator.generate())
+                .eventId(IdGenerator.generateEventId())
                 .eventType(TOPIC_SETTLEMENT_COMPLETED)
                 .batchId(batch.getId())
                 .grossAmount(batch.getTotalGross())

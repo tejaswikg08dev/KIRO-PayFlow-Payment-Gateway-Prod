@@ -27,9 +27,9 @@
           "raw": "{\n  \"email\": \"e2e-merchant@payflow.dev\",\n  \"password\": \"E2ETest@123456\",\n  \"firstName\": \"E2E\",\n  \"lastName\": \"Merchant\",\n  \"role\": \"MERCHANT\"\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/v1/auth/register",
+          "raw": "{{baseUrl}}/v1/auth/register",
           "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "auth", "register"]
+          "path": ["v1", "auth", "register"]
         }
       },
       "event": [
@@ -59,9 +59,9 @@
           "raw": "{\n  \"email\": \"e2e-merchant@payflow.dev\",\n  \"password\": \"E2ETest@123456\"\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "raw": "{{baseUrl}}/v1/auth/login",
           "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "auth", "login"]
+          "path": ["v1", "auth", "login"]
         }
       },
       "event": [
@@ -98,9 +98,9 @@
           "raw": "{\n  \"businessName\": \"E2E Test Store\",\n  \"businessType\": \"E_COMMERCE\",\n  \"registrationNumber\": \"E2E-REG-001\",\n  \"country\": \"IN\",\n  \"currency\": \"INR\",\n  \"website\": \"https://e2e-store.example.com\",\n  \"callbackUrl\": \"https://e2e-store.example.com/webhooks\",\n  \"contactEmail\": \"e2e@example.com\",\n  \"contactPhone\": \"+919999999999\"\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/v1/merchants",
+          "raw": "{{baseUrl}}/v1/merchants",
           "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "merchants"]
+          "path": ["v1", "merchants"]
         }
       },
       "event": [
@@ -136,9 +136,9 @@
           "raw": "{\n  \"name\": \"E2E Test Key\",\n  \"environment\": \"TEST\"\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/v1/merchants/{{merchantId}}/api-keys",
+          "raw": "{{baseUrl}}/v1/merchants/{{merchantId}}/api-keys",
           "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "merchants", "{{merchantId}}", "api-keys"]
+          "path": ["v1", "merchants", "{{merchantId}}", "api-keys"]
         }
       },
       "event": [
@@ -177,9 +177,9 @@
           "raw": "{\n  \"amount\": 99900,\n  \"currency\": \"INR\",\n  \"description\": \"E2E Test Payment\",\n  \"customerEmail\": \"customer@test.com\",\n  \"customerName\": \"E2E Customer\",\n  \"metadata\": { \"testId\": \"e2e-001\" },\n  \"returnUrl\": \"https://e2e-store.example.com/success\",\n  \"cancelUrl\": \"https://e2e-store.example.com/cancel\"\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/v1/payments/orders",
+          "raw": "{{baseUrl}}/v1/payments/orders",
           "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "payments", "orders"]
+          "path": ["v1", "payments", "orders"]
         }
       },
       "event": [
@@ -217,9 +217,9 @@
           "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"paymentMethod\": {\n    \"type\": \"CARD\",\n    \"card\": {\n      \"number\": \"4111111111111111\",\n      \"expiryMonth\": 12,\n      \"expiryYear\": 2026,\n      \"cvv\": \"123\",\n      \"holderName\": \"E2E Customer\"\n    }\n  },\n  \"captureMethod\": \"MANUAL\"\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/v1/payments/authorize",
+          "raw": "{{baseUrl}}/v1/payments/authorize",
           "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "payments", "authorize"]
+          "path": ["v1", "payments", "authorize"]
         }
       },
       "event": [
@@ -258,9 +258,9 @@
           "raw": "{\n  \"amount\": 99900\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/v1/payments/{{paymentId}}/capture",
+          "raw": "{{baseUrl}}/v1/payments/{{paymentId}}/capture",
           "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "payments", "{{paymentId}}", "capture"]
+          "path": ["v1", "payments", "{{paymentId}}", "capture"]
         }
       },
       "event": [
@@ -296,9 +296,9 @@
           "raw": "{\n  \"merchantId\": \"{{merchantId}}\",\n  \"fromDate\": \"2024-01-01\",\n  \"toDate\": \"2024-12-31\",\n  \"currency\": \"INR\"\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/v1/settlements/trigger",
+          "raw": "{{baseUrl}}/v1/settlements/trigger",
           "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "settlements", "trigger"]
+          "path": ["v1", "settlements", "trigger"]
         }
       },
       "event": [
@@ -328,9 +328,9 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "{{baseUrl}}/api/v1/settlements/{{settlementId}}",
+          "raw": "{{baseUrl}}/v1/settlements/{{settlementId}}",
           "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "settlements", "{{settlementId}}"]
+          "path": ["v1", "settlements", "{{settlementId}}"]
         }
       },
       "event": [

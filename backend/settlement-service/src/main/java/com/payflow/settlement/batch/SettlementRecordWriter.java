@@ -37,7 +37,7 @@ public class SettlementRecordWriter implements ItemWriter<SettlementRecord> {
 
             // Create payout entry
             Payout payout = Payout.builder()
-                    .id(IdGenerator.generate())
+                    .id(IdGenerator.generatePayoutId())
                     .merchantId(record.getMerchantId())
                     .settlementRecordId(record.getId())
                     .amount(record.getNetAmount())

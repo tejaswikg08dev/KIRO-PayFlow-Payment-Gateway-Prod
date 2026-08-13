@@ -77,7 +77,7 @@ services:
       - payflow-network
 
   kafka-ui:
-    image: redpandadata/console:latest
+    image: redpandadata/console:v2.3.8
     container_name: payflow-kafka-ui
     ports:
       - "8090:8080"
@@ -90,7 +90,7 @@ services:
       - payflow-network
 
   localstack:
-    image: localstack/localstack:latest
+    image: localstack/localstack:3.0
     container_name: payflow-localstack
     ports:
       - "4566:4566"

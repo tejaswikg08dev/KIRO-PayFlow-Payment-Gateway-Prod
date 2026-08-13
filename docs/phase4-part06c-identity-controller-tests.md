@@ -70,10 +70,10 @@ delegates to the service layer, and returns structured responses.
 
 | Method | Path | Auth Required | Description |
 |--------|------|:-------------:|-------------|
-| POST | `/api/v1/auth/register` | No | Create new account |
-| POST | `/api/v1/auth/login` | No | Authenticate user |
-| POST | `/api/v1/auth/refresh` | No | Rotate tokens |
-| GET | `/api/v1/auth/profile` | Yes (userId header) | Get current user profile |
+| POST | `/v1/auth/register` | No | Create new account |
+| POST | `/v1/auth/login` | No | Authenticate user |
+| POST | `/v1/auth/refresh` | No | Rotate tokens |
+| GET | `/v1/auth/profile` | Yes (userId header) | Get current user profile |
 
 ---
 
@@ -285,11 +285,11 @@ import java.util.UUID;
 /**
  * REST controller for authentication operations.
  * 
- * Base path: /api/v1/auth
+ * Base path: /v1/auth
  * All endpoints are publicly accessible (auth handled at gateway level).
  */
 @RestController
-@RequestMapping("/api/v1/auth")
+@RequestMapping("/v1/auth")
 public class AuthController {
 
     private final AuthService authService;
@@ -301,7 +301,7 @@ public class AuthController {
     /**
      * Register a new user account.
      * 
-     * POST /api/v1/auth/register
+     * POST /v1/auth/register
      * Returns 201 CREATED with access + refresh tokens.
      */
     @PostMapping("/register")
@@ -313,7 +313,7 @@ public class AuthController {
     /**
      * Authenticate with email and password.
      * 
-     * POST /api/v1/auth/login
+     * POST /v1/auth/login
      * Returns 200 OK with access + refresh tokens.
      */
     @PostMapping("/login")
@@ -326,7 +326,7 @@ public class AuthController {
      * Refresh an access token using a valid refresh token.
      * Implements token rotation (old token revoked, new pair issued).
      * 
-     * POST /api/v1/auth/refresh
+     * POST /v1/auth/refresh
      * Returns 200 OK with new access + refresh tokens.
      */
     @PostMapping("/refresh")
@@ -339,7 +339,7 @@ public class AuthController {
      * Get the profile of the authenticated user.
      * The userId is passed by the API Gateway after JWT validation.
      * 
-     * GET /api/v1/auth/profile
+     * GET /v1/auth/profile
      * Header: X-User-Id (set by gateway)
      * Returns 200 OK with user profile.
      */
@@ -734,7 +734,7 @@ class AuthControllerIntegrationTest {
             "integration@test.com", "P@ssw0rd!123", "Test User", "MERCHANT"
         );
 
-        mockMvc.perform(post("/api/v1/auth/register")
+        mockMvc.perform(post("/v1/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isCreated())
@@ -753,7 +753,7 @@ class AuthControllerIntegrationTest {
             "integration@test.com", "P@ssw0rd!123", "Test User", "MERCHANT"
         );
 
-        mockMvc.perform(post("/api/v1/auth/register")
+        mockMvc.perform(post("/v1/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isConflict())
@@ -766,7 +766,7 @@ class AuthControllerIntegrationTest {
     void login_Success() throws Exception {
         LoginRequest request = new LoginRequest("integration@test.com", "P@ssw0rd!123");
 
-        mockMvc.perform(post("/api/v1/auth/login")
+        mockMvc.perform(post("/v1/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isOk())
@@ -780,7 +780,7 @@ class AuthControllerIntegrationTest {
     void login_WrongPassword() throws Exception {
         LoginRequest request = new LoginRequest("integration@test.com", "WrongPass1!");
 
-        mockMvc.perform(post("/api/v1/auth/login")
+        mockMvc.perform(post("/v1/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isUnauthorized())
@@ -795,7 +795,7 @@ class AuthControllerIntegrationTest {
             "not-an-email", "short", "", "INVALID_ROLE"
         );
 
-        mockMvc.perform(post("/api/v1/auth/register")
+        mockMvc.perform(post("/v1/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isBadRequest())
@@ -813,7 +813,7 @@ class AuthControllerIntegrationTest {
 ### Register a New User
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/register \
+curl -X POST http://localhost:8080/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "email": "merchant@payflow.com",
@@ -837,7 +837,7 @@ curl -X POST http://localhost:8080/api/v1/auth/register \
 ### Login
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/login \
+curl -X POST http://localhost:8080/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "merchant@payflow.com",
@@ -859,7 +859,7 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
 ### Refresh Token
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/refresh \
+curl -X POST http://localhost:8080/v1/auth/refresh \
   -H "Content-Type: application/json" \
   -d '{
     "refreshToken": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
@@ -869,7 +869,7 @@ curl -X POST http://localhost:8080/api/v1/auth/refresh \
 ### Get Profile
 
 ```bash
-curl -X GET http://localhost:8080/api/v1/auth/profile \
+curl -X GET http://localhost:8080/v1/auth/profile \
   -H "Authorization: Bearer eyJhbGciOiJIUzM4NCJ9..." \
   -H "X-User-Id: 5a6b7c8d-9e0f-1a2b-3c4d-5e6f7a8b9c0d"
 ```

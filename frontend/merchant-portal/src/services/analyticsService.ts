@@ -10,26 +10,26 @@ import {
 
 export const analyticsService = {
   async getDashboardMetrics(): Promise<DashboardMetrics> {
-    const response = await apiClient.get<DashboardMetrics>('/api/analytics/dashboard');
+    const response = await apiClient.get<DashboardMetrics>('/v1/analytics/dashboard');
     return response.data;
   },
 
   async getRevenue(filter: AnalyticsFilter): Promise<RevenueData> {
-    const response = await apiClient.get<RevenueData>('/api/analytics/revenue', {
+    const response = await apiClient.get<RevenueData>('/v1/analytics/revenue', {
       params: filter,
     });
     return response.data;
   },
 
   async getVolume(filter: AnalyticsFilter): Promise<VolumeData> {
-    const response = await apiClient.get<VolumeData>('/api/analytics/volume', {
+    const response = await apiClient.get<VolumeData>('/v1/analytics/volume', {
       params: filter,
     });
     return response.data;
   },
 
   async getSuccessRate(filter: AnalyticsFilter): Promise<SuccessRateData> {
-    const response = await apiClient.get<SuccessRateData>('/api/analytics/success-rate', {
+    const response = await apiClient.get<SuccessRateData>('/v1/analytics/success-rate', {
       params: filter,
     });
     return response.data;
@@ -39,7 +39,7 @@ export const analyticsService = {
     filter: AnalyticsFilter
   ): Promise<PaymentMethodDistribution[]> {
     const response = await apiClient.get<PaymentMethodDistribution[]>(
-      '/api/analytics/payment-methods',
+      '/v1/analytics/payment-methods',
       { params: filter }
     );
     return response.data;
