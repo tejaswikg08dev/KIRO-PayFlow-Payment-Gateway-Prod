@@ -163,6 +163,36 @@ ports:
 
 ## 3. Authentication Errors
 
+### Login Succeeds But Frontend Doesn't Navigate
+
+**Symptom:** Login API returns 200 with token, but UI stays on login page.
+
+**Cause:** All backend responses are wrapped in `ApiResponse`:
+```json
+{ "success": true, "data": { "accessToken": "...", "user": {...} }, "timestamp": "..." }
+```
+
+The actual auth data is at `response.data.data`, NOT `response.data`. If the frontend reads `response.data.accessToken`, it gets `undefined` and localStorage stores nothing.
+
+**Fix:** Always extract from the wrapper: `response.data.data.accessToken`
+
+### Dashboard Blank After Login
+
+**Symptom:** Login succeeds, redirects to `/dashboard`, but page is completely white.
+
+**Cause:** Frontend `User` type doesn't match backend response. Backend returns `fullName` but frontend expects `firstName` + `lastName`. This causes the auth state to be partially broken.
+
+**Fix:** Ensure the frontend `User` type matches the Identity Service response:
+```typescript
+interface User {
+  id: string;
+  email: string;
+  fullName: string;   // NOT firstName + lastName
+  role: string;       // "MERCHANT", "USER", etc.
+  createdAt: string;
+}
+```
+
 ### Token Expired
 
 **Symptom:** `{"error":"UNAUTHORIZED","message":"Token has expired"}`

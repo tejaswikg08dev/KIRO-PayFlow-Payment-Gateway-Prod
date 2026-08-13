@@ -17,7 +17,7 @@ export function Navbar() {
       </div>
       <div className="flex items-center gap-4">
         <span className="text-sm text-gray-600">
-          {user?.firstName} {user?.lastName}
+          {user?.fullName}
         </span>
         <button
           onClick={handleLogout}

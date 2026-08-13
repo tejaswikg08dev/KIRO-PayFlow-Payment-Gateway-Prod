@@ -1,10 +1,8 @@
 export interface User {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
-  merchantId: string;
-  role: 'ADMIN' | 'MEMBER' | 'VIEWER';
+  fullName: string;
+  role: string;
   createdAt: string;
 }
 

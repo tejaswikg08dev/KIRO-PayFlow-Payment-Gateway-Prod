@@ -291,12 +291,14 @@ export function useTransactions(filters: TransactionFilters) {
     // WHY: Query key includes filters — different filters = different cache entries
     queryKey: transactionKeys.list(filters),
     // WHY: queryFn is the actual API call
+    // NOTE: Backend wraps all responses in ApiResponse { success, data, timestamp }
+    // Extract actual data from response.data.data
     queryFn: async () => {
-      const response = await apiClient.get<PaginatedResponse<Transaction>>(
+      const response = await apiClient.get(
         '/v1/payments',
         { params: filters }
       );
-      return response.data;
+      return response.data.data;
     },
     // WHY: Keep previous data visible while fetching new page (no loading flash)
     placeholderData: (previousData) => previousData,
@@ -426,7 +428,7 @@ apiClient.interceptors.response.use(
           { refreshToken }
         );
 
-        const { accessToken, refreshToken: newRefreshToken } = response.data;
+        const { accessToken, refreshToken: newRefreshToken } = response.data.data;
 
         // WHY: Store new tokens
         localStorage.setItem('accessToken', accessToken);
@@ -473,9 +475,9 @@ import { apiClient } from '../lib/apiClient';
 interface User {
   id: string;
   email: string;
-  merchantId: string;
-  merchantName: string;
+  fullName: string;
   role: string;
+  createdAt: string;
 }
 
 interface AuthContextType {
@@ -508,8 +510,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           // WHY: Validate token by fetching user profile
           // If token expired, interceptor will try to refresh it
-          const response = await apiClient.get<User>('/v1/auth/me');
-          setUser(response.data);
+          const response = await apiClient.get('/v1/auth/profile');
+          setUser(response.data.data);
         } catch {
           // WHY: Token invalid and refresh failed → clear everything
           localStorage.removeItem('accessToken');
@@ -524,9 +526,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     // WHY: Call auth endpoint, receive JWT tokens + user info
+    // Backend wraps all responses in ApiResponse: { success, data, timestamp }
     const response = await apiClient.post('/v1/auth/login', { email, password });
 
-    const { accessToken, refreshToken, user: userData } = response.data;
+    // Extract from ApiResponse wrapper — actual auth data is in response.data.data
+    const { accessToken, refreshToken, user: userData } = response.data.data;
 
     // WHY localStorage: Persists across page reloads and browser restarts
     // Trade-off: Vulnerable to XSS (httpOnly cookies are more secure but harder with SPAs)
