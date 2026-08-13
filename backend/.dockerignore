@@ -1,0 +1,22 @@
+# Ignore compiled output (Maven will rebuild inside Docker)
+**/target/
+
+# Ignore IDE files
+**/.idea/
+**/.vscode/
+**/*.iml
+
+# Ignore Git
+.git/
+.gitignore
+
+# Ignore docs and non-essential files
+*.md
+LICENSE
+
+# Ignore test results
+**/surefire-reports/
+**/failsafe-reports/
+
+# Ignore logs
+**/*.log

@@ -1,9 +1,23 @@
 # Stage 1: Build
 FROM maven:3.9-eclipse-temurin-17 AS builder
 WORKDIR /app
+
+# Copy parent pom and all modules (Maven reactor requires all to be present)
 COPY pom.xml .
 COPY common-lib ./common-lib
+COPY service-registry ./service-registry
+COPY config-server ./config-server
+COPY api-gateway ./api-gateway
+COPY identity-service ./identity-service
+COPY merchant-service ./merchant-service
+COPY payment-service ./payment-service
+COPY routing-service ./routing-service
+COPY settlement-service ./settlement-service
 COPY webhook-service ./webhook-service
+COPY notification-service ./notification-service
+COPY bank-simulator ./bank-simulator
+
+# Build only the target service and its dependencies
 RUN mvn clean package -pl webhook-service -am -DskipTests -B
 
 # Stage 2: Runtime
