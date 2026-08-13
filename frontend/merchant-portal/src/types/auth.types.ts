@@ -20,6 +20,7 @@ export interface RegisterRequest {
   lastName: string;
   businessName: string;
   businessType: string;
+  fullName?: string;
 }
 
 export interface AuthResponse {

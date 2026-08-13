@@ -13,7 +13,13 @@ export const authService = {
   },
 
   async register(data: RegisterRequest): Promise<AuthResponse> {
-    const response = await apiClient.post<AuthResponse>('/v1/auth/register', data);
+    const payload = {
+      fullName: `${data.firstName} ${data.lastName}`.trim(),
+      email: data.email,
+      password: data.password,
+      role: 'MERCHANT',
+    };
+    const response = await apiClient.post<AuthResponse>('/v1/auth/register', payload);
     const authData = response.data;
     localStorage.setItem(TOKEN_KEY, authData.accessToken);
     localStorage.setItem(REFRESH_TOKEN_KEY, authData.refreshToken);
