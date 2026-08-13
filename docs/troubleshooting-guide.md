@@ -193,6 +193,14 @@ interface User {
 }
 ```
 
+### 403 on API Keys / Webhooks / Merchant Profile
+
+**Symptom:** API calls return 403 Forbidden for merchant endpoints.
+
+**Cause:** Frontend calls `/v1/merchants/api-keys` but backend requires `/v1/merchants/{merchantId}/api-keys`. Without a valid UUID, the request fails.
+
+**Fix:** The merchant portal auto-creates a merchant profile during registration and stores the `merchantId` in localStorage. All services use `authService.getMerchantId()` to build correct URLs. If you registered before this fix, log out, clear localStorage, and register a new account.
+
 ### Token Expired
 
 **Symptom:** `{"error":"UNAUTHORIZED","message":"Token has expired"}`
