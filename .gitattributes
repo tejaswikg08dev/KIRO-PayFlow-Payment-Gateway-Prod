@@ -1,0 +1,16 @@
+# Auto detect text files and ensure LF line endings in repo
+* text=auto eol=lf
+
+# Shell scripts must always use LF (for Docker Linux containers)
+*.sh text eol=lf
+
+# Windows-specific files
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files
+*.jar binary
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary

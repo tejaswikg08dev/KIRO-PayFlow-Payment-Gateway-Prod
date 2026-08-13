@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ============================================
   # Infrastructure Services
@@ -22,7 +20,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - data-net
+      - payflow-network
 
   redis:
     image: redis:7-alpine
@@ -37,7 +35,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - data-net
+      - payflow-network
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
@@ -48,12 +46,12 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
     healthcheck:
-      test: ["CMD", "echo", "ruok", "|", "nc", "localhost", "2181"]
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - data-net
+      - payflow-network
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -63,21 +61,21 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_INTERNAL://kafka:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     depends_on:
       zookeeper:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list"]
       interval: 15s
       timeout: 10s
       retries: 5
     networks:
-      - data-net
+      - payflow-network
 
   kafka-ui:
     image: redpandadata/console:v2.3.8
@@ -85,12 +83,12 @@ services:
     ports:
       - "8090:8080"
     environment:
-      KAFKA_BROKERS: kafka:29092
+      KAFKA_BROKERS: kafka:9092
     depends_on:
       kafka:
         condition: service_healthy
     networks:
-      - data-net
+      - payflow-network
 
   localstack:
     image: localstack/localstack:3.0
@@ -109,80 +107,88 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - data-net
+      - payflow-network
 
   # ============================================
   # Platform Services
   # ============================================
   service-registry:
     build:
-      context: ../../backend/service-registry
-      dockerfile: Dockerfile
+      context: ../../backend
+      dockerfile: service-registry/Dockerfile
     container_name: payflow-service-registry
     ports:
       - "8761:8761"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - EUREKA_INSTANCE_INSTANCE_ID=service-registry:8761
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8761/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 5
+      start_period: 30s
     networks:
-      - backend-net
+      - payflow-network
 
   config-server:
     build:
-      context: ../../backend/config-server
-      dockerfile: Dockerfile
+      context: ../../backend
+      dockerfile: config-server/Dockerfile
     container_name: payflow-config-server
     ports:
       - "8888:8888"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - EUREKA_INSTANCE_INSTANCE_ID=config-server:8888
     depends_on:
       service-registry:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8888/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 5
+      start_period: 30s
     networks:
-      - backend-net
+      - payflow-network
 
   api-gateway:
     build:
-      context: ../../backend/api-gateway
-      dockerfile: Dockerfile
+      context: ../../backend
+      dockerfile: api-gateway/Dockerfile
     container_name: payflow-api-gateway
     ports:
       - "8080:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - EUREKA_INSTANCE_INSTANCE_ID=api-gateway:8080
     depends_on:
       service-registry:
         condition: service_healthy
       config-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 5
+      start_period: 30s
     networks:
-      - backend-net
-      - frontend-net
+      - payflow-network
 
   # ============================================
   # Business Services
   # ============================================
   identity-service:
     build:
-      context: ../../backend/identity-service
-      dockerfile: Dockerfile
+      context: ../../backend
+      dockerfile: identity-service/Dockerfile
     container_name: payflow-identity-service
     ports:
       - "8081:8081"
@@ -192,6 +198,8 @@ services:
       - SPRING_DATASOURCE_USERNAME=payflow
       - SPRING_DATASOURCE_PASSWORD=payflow123
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - EUREKA_INSTANCE_INSTANCE_ID=identity-service:8081
     depends_on:
       postgres:
         condition: service_healthy
@@ -200,18 +208,18 @@ services:
       config-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 5
+      start_period: 40s
     networks:
-      - backend-net
-      - data-net
+      - payflow-network
 
   merchant-service:
     build:
-      context: ../../backend/merchant-service
-      dockerfile: Dockerfile
+      context: ../../backend
+      dockerfile: merchant-service/Dockerfile
     container_name: payflow-merchant-service
     ports:
       - "8082:8082"
@@ -221,6 +229,8 @@ services:
       - SPRING_DATASOURCE_USERNAME=payflow
       - SPRING_DATASOURCE_PASSWORD=payflow123
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - EUREKA_INSTANCE_INSTANCE_ID=merchant-service:8082
     depends_on:
       postgres:
         condition: service_healthy
@@ -229,18 +239,18 @@ services:
       config-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 5
+      start_period: 40s
     networks:
-      - backend-net
-      - data-net
+      - payflow-network
 
   payment-service:
     build:
-      context: ../../backend/payment-service
-      dockerfile: Dockerfile
+      context: ../../backend
+      dockerfile: payment-service/Dockerfile
     container_name: payflow-payment-service
     ports:
       - "8083:8083"
@@ -249,9 +259,11 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/payflow_payment
       - SPRING_DATASOURCE_USERNAME=payflow
       - SPRING_DATASOURCE_PASSWORD=payflow123
-      - SPRING_REDIS_HOST=redis
-      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - EUREKA_INSTANCE_INSTANCE_ID=payment-service:8083
     depends_on:
       postgres:
         condition: service_healthy
@@ -264,25 +276,28 @@ services:
       config-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 5
+      start_period: 40s
     networks:
-      - backend-net
-      - data-net
+      - payflow-network
 
   routing-service:
     build:
-      context: ../../backend/routing-service
-      dockerfile: Dockerfile
+      context: ../../backend
+      dockerfile: routing-service/Dockerfile
     container_name: payflow-routing-service
     ports:
       - "8084:8084"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
-      - BANK_SIMULATOR_URL=http://bank-simulator:9000
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - EUREKA_INSTANCE_INSTANCE_ID=routing-service:8084
+      - BANK_SIMULATOR_HOST=bank-simulator
+      - BANK_SIMULATOR_PORT=9090
     depends_on:
       bank-simulator:
         condition: service_healthy
@@ -291,18 +306,18 @@ services:
       config-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8084/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8084/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 5
+      start_period: 40s
     networks:
-      - backend-net
-      - data-net
+      - payflow-network
 
   settlement-service:
     build:
-      context: ../../backend/settlement-service
-      dockerfile: Dockerfile
+      context: ../../backend
+      dockerfile: settlement-service/Dockerfile
     container_name: payflow-settlement-service
     ports:
       - "8085:8085"
@@ -311,8 +326,10 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/payflow_settlement
       - SPRING_DATASOURCE_USERNAME=payflow
       - SPRING_DATASOURCE_PASSWORD=payflow123
-      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - EUREKA_INSTANCE_INSTANCE_ID=settlement-service:8085
     depends_on:
       postgres:
         condition: service_healthy
@@ -323,27 +340,29 @@ services:
       config-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8085/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8085/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 5
+      start_period: 40s
     networks:
-      - backend-net
-      - data-net
+      - payflow-network
 
   webhook-service:
     build:
-      context: ../../backend/webhook-service
-      dockerfile: Dockerfile
+      context: ../../backend
+      dockerfile: webhook-service/Dockerfile
     container_name: payflow-webhook-service
     ports:
       - "8086:8086"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - AWS_ENDPOINT=http://localstack:4566
       - AWS_REGION=us-east-1
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - EUREKA_INSTANCE_INSTANCE_ID=webhook-service:8086
     depends_on:
       kafka:
         condition: service_healthy
@@ -354,27 +373,30 @@ services:
       config-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8086/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8086/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 5
+      start_period: 40s
     networks:
-      - backend-net
-      - data-net
+      - payflow-network
 
   notification-service:
     build:
-      context: ../../backend/notification-service
-      dockerfile: Dockerfile
+      context: ../../backend
+      dockerfile: notification-service/Dockerfile
     container_name: payflow-notification-service
     ports:
       - "8087:8087"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
-      - AWS_ENDPOINT=http://localstack:4566
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - AWS_SNS_ENDPOINT=http://localstack:4566
+      - AWS_SES_ENDPOINT=http://localstack:4566
       - AWS_REGION=us-east-1
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - EUREKA_INSTANCE_INSTANCE_ID=notification-service:8087
     depends_on:
       kafka:
         condition: service_healthy
@@ -385,18 +407,18 @@ services:
       config-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8087/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8087/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 5
+      start_period: 40s
     networks:
-      - backend-net
-      - data-net
+      - payflow-network
 
   bank-simulator:
     build:
-      context: ../../backend/bank-simulator
-      dockerfile: Dockerfile
+      context: ../../backend
+      dockerfile: bank-simulator/Dockerfile
     container_name: payflow-bank-simulator
     ports:
       - "9000:9000"
@@ -405,12 +427,13 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:9000/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 5
+      start_period: 30s
     networks:
-      - backend-net
+      - payflow-network
 
   # ============================================
   # Frontend Services
@@ -421,14 +444,12 @@ services:
       dockerfile: Dockerfile
     container_name: payflow-merchant-portal
     ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://api-gateway:8080
+      - "3000:80"
     depends_on:
       api-gateway:
         condition: service_healthy
     networks:
-      - frontend-net
+      - payflow-network
 
   hosted-checkout:
     build:
@@ -436,14 +457,12 @@ services:
       dockerfile: Dockerfile
     container_name: payflow-hosted-checkout
     ports:
-      - "3001:3001"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://api-gateway:8080
+      - "3001:80"
     depends_on:
       api-gateway:
         condition: service_healthy
     networks:
-      - frontend-net
+      - payflow-network
 
 volumes:
   postgres-data:
@@ -451,9 +470,5 @@ volumes:
   localstack-data:
 
 networks:
-  frontend-net:
-    driver: bridge
-  backend-net:
-    driver: bridge
-  data-net:
+  payflow-network:
     driver: bridge

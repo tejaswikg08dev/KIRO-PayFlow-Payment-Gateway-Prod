@@ -661,3 +661,96 @@ curl http://localhost:8761/eureka/apps
 # Test API Gateway
 curl http://localhost:8080/actuator/health
 ```
+
+
+---
+
+## Docker Clean Rebuild (Fresh Start)
+
+If you encounter Flyway migration conflicts, stale schema issues, or need to start completely fresh:
+
+```bash
+cd infra/docker
+
+# Stop everything and DELETE all data volumes
+docker compose -f docker-compose.full.yml down -v
+
+# Rebuild and start
+docker compose -f docker-compose.full.yml up -d --build
+```
+
+> ⚠️ **WARNING:** `down -v` deletes all database volumes. All data (users, merchants, payments, settlements) will be lost. Only use this during development.
+
+### Verify After Clean Start
+
+```bash
+# Check all containers are running
+docker compose -f docker-compose.full.yml ps
+
+# Watch startup logs
+docker compose -f docker-compose.full.yml logs -f
+
+# Check specific service logs
+docker compose -f docker-compose.full.yml logs -f identity-service
+docker compose -f docker-compose.full.yml logs -f api-gateway
+```
+
+### Expected Final State
+
+All services should show `healthy` or `running`:
+
+```
+payflow-postgres           healthy
+payflow-redis              healthy
+payflow-kafka              healthy
+payflow-localstack         healthy
+payflow-service-registry   healthy
+payflow-config-server      healthy
+payflow-api-gateway        healthy
+payflow-identity-service   healthy
+payflow-merchant-service   healthy
+payflow-payment-service    healthy
+payflow-routing-service    healthy
+payflow-settlement-service healthy
+payflow-webhook-service    healthy
+payflow-notification-service healthy
+payflow-bank-simulator     healthy
+payflow-merchant-portal    running
+payflow-hosted-checkout    running
+```
+
+---
+
+## Docker Build Architecture
+
+All backend services use `backend/` as the Docker build context:
+
+```
+docker-compose.full.yml
+    │
+    ├── context: ../../backend
+    │   └── dockerfile: service-registry/Dockerfile
+    │   └── dockerfile: config-server/Dockerfile
+    │   └── dockerfile: api-gateway/Dockerfile
+    │   └── dockerfile: identity-service/Dockerfile
+    │   └── dockerfile: merchant-service/Dockerfile
+    │   └── dockerfile: payment-service/Dockerfile
+    │   └── dockerfile: routing-service/Dockerfile
+    │   └── dockerfile: settlement-service/Dockerfile
+    │   └── dockerfile: webhook-service/Dockerfile
+    │   └── dockerfile: notification-service/Dockerfile
+    │   └── dockerfile: bank-simulator/Dockerfile
+    │
+    ├── context: ../../frontend/merchant-portal
+    │   └── dockerfile: Dockerfile
+    │
+    └── context: ../../frontend/hosted-checkout
+        └── dockerfile: Dockerfile
+```
+
+This ensures each service Dockerfile can access:
+- `pom.xml` (parent POM)
+- `common-lib/` (shared library)
+- `<service>/` (the service being built)
+
+Without `../` paths in COPY commands (which Docker doesn't allow).

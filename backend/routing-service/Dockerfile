@@ -1,47 +1,18 @@
-# Build stage
-FROM eclipse-temurin:17-jdk-alpine AS build
-
+# Stage 1: Build
+FROM maven:3.9-eclipse-temurin-17 AS builder
 WORKDIR /app
-
-# Copy Maven wrapper and POM
 COPY pom.xml .
-COPY .mvn .mvn
-COPY mvnw .
-RUN chmod +x mvnw
+COPY common-lib ./common-lib
+COPY routing-service ./routing-service
+RUN mvn clean package -pl routing-service -am -DskipTests -B
 
-# Download dependencies (cached layer)
-RUN ./mvnw dependency:go-offline -B || true
-
-# Copy source code
-COPY src ./src
-
-# Build the application
-RUN ./mvnw clean package -DskipTests -B
-
-# Runtime stage
+# Stage 2: Runtime
 FROM eclipse-temurin:17-jre-alpine
-
 WORKDIR /app
-
-# Add non-root user
 RUN addgroup -S payflow && adduser -S payflow -G payflow
-
-# Copy the built JAR
-COPY --from=build /app/target/routing-service-*.jar app.jar
-
-# Set ownership
-RUN chown -R payflow:payflow /app
-
 USER payflow
-
-# Expose port
+COPY --from=builder /app/routing-service/target/*.jar app.jar
 EXPOSE 8084
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD wget -qO- http://localhost:8084/actuator/health || exit 1
-
-# JVM tuning for containers
-ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XX:+UseStringDeduplication"
-
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+HEALTHCHECK --interval=15s --timeout=10s --retries=5 --start-period=30s \
+    CMD wget -qO- http://localhost:8084/actuator/health || exit 1
+ENTRYPOINT ["java", "-jar", "app.jar"]

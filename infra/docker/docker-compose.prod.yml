@@ -1,7 +1,6 @@
-version: '3.8'
-
 # Production Docker Compose - Services Only
 # Infrastructure is managed externally (AWS RDS, ElastiCache, MSK)
+# Frontend API URL is baked into the build via constants.ts
 
 services:
   service-registry:
@@ -12,7 +11,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8761/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -39,7 +38,7 @@ services:
       service-registry:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8888/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -67,7 +66,7 @@ services:
       config-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -98,7 +97,7 @@ services:
       config-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -127,7 +126,7 @@ services:
       config-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -158,7 +157,7 @@ services:
       config-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -185,7 +184,7 @@ services:
       config-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8084/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8084/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -215,7 +214,7 @@ services:
       config-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8085/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8085/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -243,7 +242,7 @@ services:
       config-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8086/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8086/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -271,7 +270,7 @@ services:
       config-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8087/actuator/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8087/actuator/health"]
       interval: 15s
       timeout: 10s
       retries: 5
@@ -287,9 +286,7 @@ services:
     image: ${DOCKER_REGISTRY}/payflow-merchant-portal:${IMAGE_TAG:-latest}
     container_name: payflow-merchant-portal
     ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=${API_GATEWAY_URL}
+      - "3000:80"
     networks:
       - frontend-net
 
@@ -297,9 +294,7 @@ services:
     image: ${DOCKER_REGISTRY}/payflow-hosted-checkout:${IMAGE_TAG:-latest}
     container_name: payflow-hosted-checkout
     ports:
-      - "3001:3001"
-    environment:
-      - NEXT_PUBLIC_API_URL=${API_GATEWAY_URL}
+      - "3001:80"
     networks:
       - frontend-net
 

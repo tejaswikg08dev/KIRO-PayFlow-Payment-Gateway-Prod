@@ -1,40 +1,18 @@
 # Stage 1: Build
-FROM eclipse-temurin:17-jdk-alpine AS builder
+FROM maven:3.9-eclipse-temurin-17 AS builder
 WORKDIR /app
-
 COPY pom.xml .
-COPY ../pom.xml ../pom.xml
-
-# Download dependencies (cached layer)
-RUN --mount=type=cache,target=/root/.m2 \
-    mvn dependency:go-offline -B 2>/dev/null || true
-
-COPY src ./src
-RUN --mount=type=cache,target=/root/.m2 \
-    mvn clean package -DskipTests -B
+COPY common-lib ./common-lib
+COPY bank-simulator ./bank-simulator
+RUN mvn clean package -pl bank-simulator -am -DskipTests -B
 
 # Stage 2: Runtime
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
-
-# Security: run as non-root
 RUN addgroup -S payflow && adduser -S payflow -G payflow
 USER payflow
-
-# Copy artifact
-COPY --from=builder /app/target/bank-simulator-*.jar app.jar
-
-# JVM tuning for containers
-ENV JAVA_OPTS="-XX:+UseContainerSupport \
-    -XX:MaxRAMPercentage=75.0 \
-    -XX:+UseG1GC \
-    -XX:+HeapDumpOnOutOfMemoryError \
-    -Djava.security.egd=file:/dev/./urandom"
-
-# HTTP management port + TCP ISO 8583 port
+COPY --from=builder /app/bank-simulator/target/*.jar app.jar
 EXPOSE 9000 9090
-
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+HEALTHCHECK --interval=15s --timeout=10s --retries=5 --start-period=30s \
     CMD wget -qO- http://localhost:9000/actuator/health || exit 1
-
-ENTRYPOINT ["sh", "-c", "java ${JAVA_OPTS} -jar app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
