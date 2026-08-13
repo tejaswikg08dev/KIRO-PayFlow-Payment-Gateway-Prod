@@ -137,83 +137,101 @@ curl -X POST http://localhost:8080/v1/auth/logout \
 
 ## 3. Merchant Service Endpoints
 
-### GET /v1/merchants/profile
+> **Note:** All merchant endpoints require a `{merchantId}` in the URL path. After registration, the frontend auto-creates a merchant and stores the ID. Use `GET /v1/merchants` to list your merchants.
 
-Get current merchant's profile.
+### POST /v1/merchants
 
-```bash
-curl http://localhost:8080/v1/merchants/profile \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-**Response (200 OK):**
-```json
-{
-  "id": "merchant-uuid-001",
-  "email": "merchant@example.com",
-  "businessName": "Acme Payments",
-  "phone": "+919876543210",
-  "gstNumber": "29ABCDE1234F1Z5",
-  "pan": "ABCDE1234F",
-  "websiteUrl": "https://acme.com",
-  "status": "ACTIVE",
-  "createdAt": "2024-01-15T10:30:00Z"
-}
-```
-
-### PUT /v1/merchants/profile
-
-Update merchant profile.
+Create a new merchant profile (called automatically during registration).
 
 ```bash
-curl -X PUT http://localhost:8080/v1/merchants/profile \
+curl -X POST http://localhost:8080/v1/merchants \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "businessName": "Acme Payments Ltd",
-    "websiteUrl": "https://acme-payments.com"
+    "name": "Acme Payments",
+    "email": "merchant@example.com",
+    "businessType": "Individual",
+    "mdrRate": 2.0
   }'
-```
-
-### POST /v1/merchants/api-keys
-
-Generate a new API key.
-
-```bash
-curl -X POST http://localhost:8080/v1/merchants/api-keys \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Production Key"}'
 ```
 
 **Response (201 Created):**
 ```json
 {
-  "id": "key-uuid-001",
-  "name": "Production Key",
-  "key": "pk_live_a3f9b2c1d4e5f6a7b8c9d0e1f2a3b4c5",
-  "maskedKey": "pk_live_****b4c5",
-  "createdAt": "2024-01-15T10:30:00Z"
+  "success": true,
+  "data": {
+    "id": "merchant-uuid-001",
+    "name": "Acme Payments",
+    "email": "merchant@example.com",
+    "businessType": "Individual",
+    "status": "ACTIVE",
+    "createdAt": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+### GET /v1/merchants/{merchantId}
+
+Get merchant profile by ID.
+
+```bash
+curl http://localhost:8080/v1/merchants/merchant-uuid-001 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### PUT /v1/merchants/{merchantId}
+
+Update merchant profile.
+
+```bash
+curl -X PUT http://localhost:8080/v1/merchants/merchant-uuid-001 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Acme Payments Ltd",
+    "businessType": "Company"
+  }'
+```
+
+### POST /v1/merchants/{merchantId}/api-keys
+
+Generate a new API key.
+
+```bash
+curl -X POST http://localhost:8080/v1/merchants/merchant-uuid-001/api-keys \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response (201 Created):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "key-uuid-001",
+    "key": "key_a3f9b2c1d4e5f6a7b8c9d0e1f2a3b4c5",
+    "maskedKey": "key_****b4c5",
+    "createdAt": "2024-01-15T10:30:00Z"
+  }
 }
 ```
 
 > ⚠️ The full `key` is shown ONLY in this response. Save it immediately.
 
-### GET /v1/merchants/api-keys
+### GET /v1/merchants/{merchantId}/api-keys
 
 List all API keys (masked).
 
 ```bash
-curl http://localhost:8080/v1/merchants/api-keys \
+curl http://localhost:8080/v1/merchants/merchant-uuid-001/api-keys \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-### DELETE /v1/merchants/api-keys/{keyId}
+### DELETE /v1/merchants/{merchantId}/api-keys/{keyId}
 
 Revoke an API key.
 
 ```bash
-curl -X DELETE http://localhost:8080/v1/merchants/api-keys/key-uuid-001 \
+curl -X DELETE http://localhost:8080/v1/merchants/merchant-uuid-001/api-keys/key-uuid-001 \
   -H "Authorization: Bearer $TOKEN"
 ```
 

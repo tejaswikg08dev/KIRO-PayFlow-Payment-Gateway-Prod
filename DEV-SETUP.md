@@ -475,7 +475,12 @@ Save the `accessToken` from the response.
 ### 3. Access Protected Endpoint
 
 ```bash
+# List merchants (should show the auto-created one)
 curl http://localhost:8080/v1/merchants \
+  -H "Authorization: Bearer <your-access-token>"
+
+# Generate API key (use the merchantId from the list above)
+curl -X POST http://localhost:8080/v1/merchants/<merchantId>/api-keys \
   -H "Authorization: Bearer <your-access-token>"
 ```
 
