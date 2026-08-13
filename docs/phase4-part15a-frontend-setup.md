@@ -80,7 +80,7 @@ export default defineConfig({
       // WHY proxy: Avoid CORS during development
       // Frontend on :3000, API on :8080 → different origins → CORS error
       // Proxy makes browser think API is on :3000 too
-      '/api': {
+      '/v1': {
         target: 'http://localhost:8080',
         changeOrigin: true,
       },

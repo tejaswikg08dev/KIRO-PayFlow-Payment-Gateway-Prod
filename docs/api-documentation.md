@@ -58,27 +58,36 @@ Register → Login → Get JWT (24h TTL) → Use in requests → Refresh when ex
 
 ### POST /v1/auth/register
 
-Register a new merchant account.
+Register a new user account.
 
 ```bash
 curl -X POST http://localhost:8080/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
+    "fullName": "Rajesh Kumar",
     "email": "merchant@example.com",
     "password": "SecurePass123!",
-    "businessName": "Acme Payments",
-    "phone": "+919876543210"
+    "role": "MERCHANT"
   }'
 ```
 
 **Response (201 Created):**
 ```json
 {
-  "id": "merchant-uuid-001",
-  "email": "merchant@example.com",
-  "businessName": "Acme Payments",
-  "status": "ACTIVE",
-  "createdAt": "2024-01-15T10:30:00Z"
+  "success": true,
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+    "refreshToken": "refresh-token-uuid",
+    "expiresIn": 900000,
+    "user": {
+      "id": "user-uuid-001",
+      "email": "merchant@example.com",
+      "fullName": "Rajesh Kumar",
+      "role": "MERCHANT",
+      "createdAt": "2024-01-15T10:30:00Z"
+    }
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
 }
 ```
 
