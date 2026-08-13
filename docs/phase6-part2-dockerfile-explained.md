@@ -83,77 +83,62 @@ SINGLE-STAGE (BAD):                 MULTI-STAGE (GOOD):
 
 ## 3. PayFlow Dockerfile Line-by-Line
 
-This is the actual Dockerfile used by PayFlow's payment-service:
+This is the actual Dockerfile pattern used by PayFlow services. The build context is `backend/` (the entire multi-module project):
 
 ```dockerfile
 # ╔══════════════════════════════════════════════════════════════════╗
 # ║  STAGE 1: BUILD — Compile the application with Maven            ║
 # ╚══════════════════════════════════════════════════════════════════╝
 
-# Use Eclipse Temurin JDK 17 on Alpine Linux as the build environment
-# Alpine is tiny (~5MB) — keeps even the build stage smaller
-FROM eclipse-temurin:17-jdk-alpine AS build
+# Use Maven image which includes JDK 17
+FROM maven:3.9-eclipse-temurin-17 AS builder
+WORKDIR /app
 
-# Set the working directory inside the container
-# All subsequent commands run relative to this path
-WORKDIR /workspace
-
-# ─── Layer Caching Trick ───────────────────────────────────────────
-# Copy ONLY the POM file first (changes rarely)
-# Maven will download dependencies — this layer gets CACHED
+# ─── Copy ALL modules ──────────────────────────────────────────────
+# Maven's parent pom declares all modules in its reactor.
+# All must be present for Maven to resolve the project structure.
 COPY pom.xml .
+COPY common-lib ./common-lib
+COPY service-registry ./service-registry
+COPY config-server ./config-server
+COPY api-gateway ./api-gateway
+COPY identity-service ./identity-service
+COPY merchant-service ./merchant-service
+COPY payment-service ./payment-service
+COPY routing-service ./routing-service
+COPY settlement-service ./settlement-service
+COPY webhook-service ./webhook-service
+COPY notification-service ./notification-service
+COPY bank-simulator ./bank-simulator
 
-# Download all dependencies (cached unless pom.xml changes)
-RUN mvn dependency:go-offline -B
-
-# NOW copy source code (changes frequently)
-# This layer rebuilds every time code changes, but deps are cached
-COPY src ./src
-
-# Build the application, skip tests (tests run in CI separately)
-RUN mvn clean package -DskipTests -B
-
-# The JAR is now at: /workspace/target/payment-service-0.0.1-SNAPSHOT.jar
+# Build ONLY the target service and its dependencies
+# -pl = project list, -am = also-make, -B = batch mode
+RUN mvn clean package -pl payment-service -am -DskipTests -B
 
 # ╔══════════════════════════════════════════════════════════════════╗
 # ║  STAGE 2: RUN — Create minimal runtime image                    ║
 # ╚══════════════════════════════════════════════════════════════════╝
 
 # Use JRE only (not full JDK) — no compiler needed at runtime
-# Alpine variant keeps the image small
 FROM eclipse-temurin:17-jre-alpine
 
 # Create a non-root user for security
-# Never run production apps as root!
 RUN addgroup -S payflow && adduser -S payflow -G payflow
-
-# Set working directory for the runtime
 WORKDIR /app
-
-# Copy ONLY the built JAR from the build stage
-# --from=build references Stage 1 — everything else is discarded
-COPY --from=build /workspace/target/*.jar app.jar
-
-# Change ownership to non-root user
-RUN chown payflow:payflow app.jar
-
-# Switch to non-root user
 USER payflow
 
-# Document that this container listens on port 8080
-# This doesn't actually publish the port — it's documentation
-EXPOSE 8080
+# Copy ONLY the built JAR from the build stage
+COPY --from=builder /app/payment-service/target/*.jar app.jar
 
-# Health check — Docker/orchestrator can verify container is healthy
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1
+# Document that this container listens on port 8083
+EXPOSE 8083
 
-# JVM settings via environment variable (configurable at runtime)
-ENV JAVA_OPTS="-Xmx512m -Xms256m"
+# Health check — Docker can verify container is healthy
+HEALTHCHECK --interval=15s --timeout=10s --retries=5 --start-period=30s \
+    CMD wget -qO- http://localhost:8083/actuator/health || exit 1
 
 # Start the application
-# Using exec form (JSON array) — proper signal handling
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
 
 ---

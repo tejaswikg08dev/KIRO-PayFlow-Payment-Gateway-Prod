@@ -45,76 +45,70 @@
 
 ## 1. Multi-Stage Dockerfile
 
-Every Java service uses the same Dockerfile pattern with two stages.
+Every Java service uses the same Dockerfile pattern with two stages. The build context is `backend/` (the entire multi-module project), so all modules are available to Maven.
 
 ```dockerfile
 # ════════════════════════════════════════════════════════════════
 # Stage 1: BUILD (heavy — downloads dependencies, compiles code)
 # ════════════════════════════════════════════════════════════════
-FROM eclipse-temurin:21-jdk-alpine AS builder
-
-# WHY: Set working directory inside the container
+FROM maven:3.9-eclipse-temurin-17 AS builder
 WORKDIR /app
 
-# WHY: Copy pom.xml FIRST (before source code)
-# Docker caches layers. If pom.xml doesn't change, dependencies
-# are cached and not re-downloaded on every code change.
+# Copy parent pom and ALL modules (Maven reactor requires all to be present)
 COPY pom.xml .
-COPY .mvn .mvn
-COPY mvnw .
+COPY common-lib ./common-lib
+COPY service-registry ./service-registry
+COPY config-server ./config-server
+COPY api-gateway ./api-gateway
+COPY identity-service ./identity-service
+COPY merchant-service ./merchant-service
+COPY payment-service ./payment-service
+COPY routing-service ./routing-service
+COPY settlement-service ./settlement-service
+COPY webhook-service ./webhook-service
+COPY notification-service ./notification-service
+COPY bank-simulator ./bank-simulator
 
-# WHY: Download dependencies in a separate layer (cached!)
-# -DskipTests: Don't run tests during build (CI handles that)
-# -Dmaven.main.skip: Don't compile yet, just download deps
-RUN chmod +x mvnw && ./mvnw dependency:go-offline -DskipTests
-
-# NOW copy source code (this layer changes frequently)
-COPY src ./src
-
-# WHY: Build the JAR (skip tests — already ran in CI)
-RUN ./mvnw package -DskipTests -Dspring-boot.build-image.skip=true
+# Build only the target service + its dependencies (-pl = project list, -am = also-make)
+RUN mvn clean package -pl payment-service -am -DskipTests -B
 
 # ════════════════════════════════════════════════════════════════
 # Stage 2: RUNTIME (slim — only JRE + our JAR)
 # ════════════════════════════════════════════════════════════════
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:17-jre-alpine
 
-# WHY: Non-root user for security
-# If container is compromised, attacker doesn't get root access
+# Non-root user for security
 RUN addgroup -S payflow && adduser -S payflow -G payflow
-
 WORKDIR /app
-
-# WHY: Copy ONLY the built JAR from stage 1
-# This means the final image doesn't have Maven, source code, or build tools
-COPY --from=builder /app/target/*.jar app.jar
-
-# WHY: Change ownership to non-root user
-RUN chown payflow:payflow app.jar
 USER payflow
 
-# WHY: Expose port (documentation — docker-compose still needs ports mapping)
-EXPOSE 8080
+# Copy ONLY the built JAR from stage 1
+COPY --from=builder /app/payment-service/target/*.jar app.jar
 
-# WHY: Health check — Docker can detect if JVM crashed
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD wget -qO- http://localhost:8080/actuator/health || exit 1
+# Expose port (documentation — docker-compose still needs ports mapping)
+EXPOSE 8083
 
-# WHY: Use exec form (not shell form) — signals are forwarded correctly
-# java -XX:+UseContainerSupport: Respect container memory limits
-ENTRYPOINT ["java", \
-    "-XX:+UseContainerSupport", \
-    "-XX:MaxRAMPercentage=75.0", \
-    "-Djava.security.egd=file:/dev/./urandom", \
-    "-jar", "app.jar"]
+# Health check — Docker can detect if JVM crashed
+HEALTHCHECK --interval=15s --timeout=10s --retries=5 --start-period=30s \
+    CMD wget -qO- http://localhost:8083/actuator/health || exit 1
+
+# Use exec form (not shell form) — signals are forwarded correctly
+ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
+
+**Key points:**
+- Build context in `docker-compose.full.yml` is `../../backend` (not service-specific)
+- All modules are copied because Maven's parent pom references them in its reactor
+- Only the target service is actually built (`-pl service-name -am`)
+- No `mvnw` — the `maven:3.9` Docker image provides Maven directly
+- Runtime uses Alpine JRE (~180MB) with non-root user and healthcheck
 
 ### Size Comparison
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │ Without multi-stage:                                         │
-│   eclipse-temurin:21-jdk-alpine (base)     ~350 MB          │
+│   eclipse-temurin:17-jdk-alpine (base)     ~350 MB          │
 │   + Maven cache                            ~200 MB          │
 │   + Source code                            ~10 MB           │
 │   + Compiled JAR                           ~50 MB           │
@@ -122,7 +116,7 @@ ENTRYPOINT ["java", \
 │   TOTAL:                                   ~610 MB ❌       │
 │                                                              │
 │ With multi-stage:                                            │
-│   eclipse-temurin:21-jre-alpine (base)     ~150 MB          │
+│   eclipse-temurin:17-jre-alpine (base)     ~150 MB          │
 │   + Compiled JAR only                      ~50 MB           │
 │   ═══════════════════════════════════════════════            │
 │   TOTAL:                                   ~200 MB ✅       │
@@ -190,7 +184,7 @@ services:
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,HOST:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,HOST://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,HOST://localhost:9092
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093,HOST://0.0.0.0:9092
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
@@ -303,7 +297,7 @@ services:
       - DB_USER=${DB_USER:-payflow}
       - DB_PASSWORD=${DB_PASSWORD:-payflow123}
       - REDIS_HOST=redis
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
       postgres:
         condition: service_healthy
@@ -333,7 +327,7 @@ services:
       - DB_USER=${DB_USER:-payflow}
       - DB_PASSWORD=${DB_PASSWORD:-payflow123}
       - REDIS_HOST=redis
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - ROUTING_SERVICE_URL=http://routing-service:8083
     depends_on:
       postgres:
@@ -356,7 +350,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - REDIS_HOST=redis
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - BANK_HOST=bank-simulator
       - BANK_PORT=9090
     depends_on:
@@ -422,7 +416,7 @@ services:
       - "8087:8087"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - AWS_DYNAMODB_ENDPOINT=http://localstack:4566
       - AWS_REGION=ap-south-1
     depends_on:
@@ -442,7 +436,7 @@ services:
       - "8088:8088"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - AWS_SES_ENDPOINT=http://localstack:4566
       - AWS_SNS_ENDPOINT=http://localstack:4566
       - AWS_REGION=ap-south-1
@@ -584,8 +578,8 @@ DB_PASSWORD=payflow123
 # WHY: Change this in production! Never use default passwords.
 
 # ═══════════════ KAFKA ═══════════════
-KAFKA_BOOTSTRAP_SERVERS=kafka:29092
-# WHY kafka:29092: Internal Docker network address
+KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+# WHY kafka:9092: Internal Docker network address
 # From host machine: use localhost:9092
 
 # ═══════════════ REDIS ═══════════════
@@ -835,7 +829,7 @@ fi
 | `kafka: connection refused` | Kafka not ready yet | Wait longer or increase `start_period` |
 | `OOM killed` | Container exceeded memory limit | Add `deploy.resources.limits.memory` |
 | `Permission denied` on volume | Linux file ownership mismatch | Use `user: "${UID}:${GID}"` or fix volume permissions |
-| Build fails at `mvnw dependency:go-offline` | Network issue during build | Check internet, retry with `--no-cache` |
+| Build fails at `mvn dependency:go-offline` | Network issue during build | Check internet, retry with `--no-cache` |
 | `Cannot connect to the Docker daemon` | Docker Desktop not running | Start Docker Desktop |
 | Service starts but unhealthy | Application error during startup | Check logs: `docker-compose logs <service>` |
 | Init scripts not running | Volume already has data | `docker-compose down -v` then `up` again |

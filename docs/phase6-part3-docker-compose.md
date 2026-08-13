@@ -149,7 +149,7 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
@@ -208,95 +208,129 @@ services:
     networks: [data-net]
 
   # ─── Application Services ──────────────────────────
+  # Build context is ./backend for all services (Maven multi-module)
+  # Each service specifies its own Dockerfile within the context
   api-gateway:
-    build: ./backend/api-gateway
+    build:
+      context: ./backend
+      dockerfile: api-gateway/Dockerfile
     container_name: payflow-gateway
     ports:
       - "8080:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATA_REDIS_HOST=redis
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
     depends_on:
-      identity-service:
+      service-registry:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks: [frontend-net, backend-net]
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/actuator/health"]
-      interval: 30s
-      retries: 3
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      retries: 5
 
   identity-service:
-    build: ./backend/identity-service
+    build:
+      context: ./backend
+      dockerfile: identity-service/Dockerfile
     container_name: payflow-identity
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/payflow_identity
-      - SPRING_DATA_REDIS_HOST=redis
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
     depends_on:
       postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
+      service-registry: { condition: service_healthy }
     networks: [backend-net, data-net]
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/actuator/health"]
-      interval: 30s
-      retries: 3
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/actuator/health"]
+      interval: 15s
+      retries: 5
 
   merchant-service:
-    build: ./backend/merchant-service
+    build:
+      context: ./backend
+      dockerfile: merchant-service/Dockerfile
     container_name: payflow-merchant
     environment:
       - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/payflow_merchants
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/payflow_merchant
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
     depends_on:
       postgres: { condition: service_healthy }
+      service-registry: { condition: service_healthy }
     networks: [backend-net, data-net]
 
   payment-service:
-    build: ./backend/payment-service
+    build:
+      context: ./backend
+      dockerfile: payment-service/Dockerfile
     container_name: payflow-payment
     environment:
       - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/payflow_payments
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/payflow_payment
       - SPRING_DATA_REDIS_HOST=redis
-      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
       kafka: { condition: service_healthy }
+      service-registry: { condition: service_healthy }
     networks: [backend-net, data-net]
 
-  routing-engine:
-    build: ./backend/routing-engine
+  routing-service:
+    build:
+      context: ./backend
+      dockerfile: routing-service/Dockerfile
     container_name: payflow-routing
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
     networks: [backend-net, data-net]
 
   bank-simulator:
-    build: ./backend/bank-simulator
+    build:
+      context: ./backend
+      dockerfile: bank-simulator/Dockerfile
     container_name: payflow-bank
     networks: [backend-net]
 
   settlement-service:
-    build: ./backend/settlement-service
+    build:
+      context: ./backend
+      dockerfile: settlement-service/Dockerfile
     container_name: payflow-settlement
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/payflow_settlement
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
     networks: [backend-net, data-net]
 
   notification-service:
-    build: ./backend/notification-service
+    build:
+      context: ./backend
+      dockerfile: notification-service/Dockerfile
     container_name: payflow-notification
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
     networks: [backend-net, data-net]
 
   webhook-service:
-    build: ./backend/webhook-service
+    build:
+      context: ./backend
+      dockerfile: webhook-service/Dockerfile
     container_name: payflow-webhook
-    networks: [backend-net, data-net]
-
-  analytics-service:
-    build: ./backend/analytics-service
-    container_name: payflow-analytics
-    networks: [backend-net, data-net]
-
-  reconciliation-service:
-    build: ./backend/reconciliation-service
-    container_name: payflow-reconciliation
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://service-registry:8761/eureka/
     networks: [backend-net, data-net]
 
 networks:
@@ -438,7 +472,7 @@ docker compose config                         # Validate compose file
 | Services start before DB is ready | `depends_on` without health condition | Add `condition: service_healthy` |
 | `no space left on device` | Docker images/volumes filling disk | Run `docker system prune -a` |
 | Changes not reflected | Old image cached | Run `docker compose up -d --build` |
-| Kafka connection refused | Using `localhost` instead of container name | Use `kafka:29092` for inter-container communication |
+| Kafka connection refused | Using `localhost` instead of container name | Use `kafka:9092` for inter-container communication |
 
 ---
 

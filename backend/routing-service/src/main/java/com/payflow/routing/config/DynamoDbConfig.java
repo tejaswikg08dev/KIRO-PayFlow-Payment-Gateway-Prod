@@ -61,7 +61,7 @@ public class DynamoDbConfig {
      * Provides pre-configured bank routes for testing.
      */
     @Bean
-    @Profile({"dev", "default"})
+    @Profile({"dev", "default", "docker"})
     public RoutingMetricsRepository inMemoryMetricsRepository() {
         return new InMemoryRoutingMetricsRepository();
     }

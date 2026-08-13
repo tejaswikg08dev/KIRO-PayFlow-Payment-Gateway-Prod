@@ -100,7 +100,7 @@ docker exec -it payflow-kafka kafka-topics --create \
 |---------|-------|-----|
 | `LEADER_NOT_AVAILABLE` | Kafka still starting | Wait 30 seconds, retry |
 | `UNKNOWN_TOPIC` | Topic not created | Enable `auto.create.topics` or create manually |
-| Connection refused from service | Using `localhost` instead of `kafka` | Use `kafka:29092` for internal Docker networking |
+| Connection refused from service | Using `localhost` instead of `kafka` | Use `kafka:9092` for internal Docker networking |
 
 ---
 
