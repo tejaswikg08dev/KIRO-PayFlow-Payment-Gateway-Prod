@@ -54,9 +54,7 @@ $ docker run ... (x9 more)
 ## 2. docker-compose.yml Anatomy
 
 ```yaml
-# docker-compose.yml structure
-version: '3.8'                    # Compose file format version
-
+# docker-compose.yml structure (version field is obsolete in modern Docker Compose)
 services:                         # Each service = one container
   service-name:
     image: image:tag              # Use existing image OR...
@@ -94,8 +92,6 @@ This compose file runs only the infrastructure — used during local development
 
 ```yaml
 # docker-compose.infra.yml
-version: '3.8'
-
 services:
   # ─── PostgreSQL ─────────────────────────────────────
   postgres:
@@ -196,8 +192,6 @@ This runs everything — infrastructure + all 11 microservices.
 
 ```yaml
 # docker-compose.yml (full-stack)
-version: '3.8'
-
 services:
   # ─── Infrastructure (same as above, abbreviated) ────
   postgres:

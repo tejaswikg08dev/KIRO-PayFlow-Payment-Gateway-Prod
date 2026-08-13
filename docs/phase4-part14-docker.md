@@ -139,8 +139,6 @@ The core services needed for development.
 
 ```yaml
 # docker-compose.yml — Development environment
-version: '3.8'
-
 services:
   # ═══════════════ INFRASTRUCTURE ═══════════════
 
@@ -265,15 +263,13 @@ All services including application microservices.
 # docker-compose.full.yml — Complete system (infrastructure + services)
 # Usage: docker-compose -f docker-compose.yml -f docker-compose.full.yml up
 
-version: '3.8'
-
 services:
   # ═══════════════ APPLICATION SERVICES ═══════════════
 
   api-gateway:
     build:
-      context: ./backend/api-gateway
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: api-gateway/Dockerfile
     container_name: payflow-api-gateway
     ports:
       - "8080:8080"
@@ -296,8 +292,8 @@ services:
 
   merchant-service:
     build:
-      context: ./backend/merchant-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: merchant-service/Dockerfile
     container_name: payflow-merchant-service
     ports:
       - "8081:8081"
@@ -326,8 +322,8 @@ services:
 
   payment-service:
     build:
-      context: ./backend/payment-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: payment-service/Dockerfile
     container_name: payflow-payment-service
     ports:
       - "8082:8082"
@@ -352,8 +348,8 @@ services:
 
   routing-service:
     build:
-      context: ./backend/routing-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: routing-service/Dockerfile
     container_name: payflow-routing-service
     ports:
       - "8083:8083"
@@ -376,8 +372,8 @@ services:
 
   bank-simulator:
     build:
-      context: ./backend/bank-simulator
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: bank-simulator/Dockerfile
     container_name: payflow-bank-simulator
     ports:
       - "8085:8085"   # HTTP management port
@@ -397,8 +393,8 @@ services:
 
   settlement-service:
     build:
-      context: ./backend/settlement-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: settlement-service/Dockerfile
     container_name: payflow-settlement-service
     ports:
       - "8086:8086"
@@ -419,8 +415,8 @@ services:
 
   webhook-service:
     build:
-      context: ./backend/webhook-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: webhook-service/Dockerfile
     container_name: payflow-webhook-service
     ports:
       - "8087:8087"
@@ -439,8 +435,8 @@ services:
 
   notification-service:
     build:
-      context: ./backend/notification-service
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: notification-service/Dockerfile
     container_name: payflow-notification-service
     ports:
       - "8088:8088"

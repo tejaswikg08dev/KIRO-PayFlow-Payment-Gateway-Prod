@@ -65,22 +65,45 @@ A production-ready payment gateway platform built with **11 Java Spring Boot mic
 - Java 17+
 - Maven 3.9+
 - Node.js 20+
-- Docker Desktop
+- Docker Desktop (8GB+ RAM allocated)
 
-### Start Infrastructure
+### Option A: One-Command Full Docker Setup
+
+```powershell
+cd infra/docker
+Copy-Item .env.example .env
+docker compose -f docker-compose.full.yml up -d --build
+```
+
+This builds and starts all 17 containers (infrastructure + 11 backend services + 2 frontends). First build takes ~8-10 minutes.
+
+Verify:
+```powershell
+docker compose -f docker-compose.full.yml ps
+```
+
+| URL | What |
+|-----|------|
+| http://localhost:8761 | Eureka Dashboard |
+| http://localhost:8080/actuator/health | API Gateway |
+| http://localhost:3000 | Merchant Portal |
+| http://localhost:3001 | Hosted Checkout |
+
+Stop: `docker compose -f docker-compose.full.yml down`
+Reset: `docker compose -f docker-compose.full.yml down -v` (⚠️ deletes DB data)
+
+### Option B: Infrastructure Docker + Local Services
+
 ```bash
+# Start infrastructure
 cd infra/docker
 docker compose up -d
-```
 
-### Build Backend
-```bash
+# Build backend (from backend/ directory)
 cd backend
 mvn clean install -DskipTests
-```
 
-### Run Services (in order)
-```bash
+# Start services in order (each in separate terminal, from backend/ directory)
 mvn spring-boot:run -pl service-registry
 mvn spring-boot:run -pl config-server
 mvn spring-boot:run -pl api-gateway
@@ -92,16 +115,29 @@ mvn spring-boot:run -pl settlement-service
 mvn spring-boot:run -pl webhook-service
 mvn spring-boot:run -pl notification-service
 mvn spring-boot:run -pl bank-simulator
+
+# Start frontends
+cd frontend/merchant-portal && npm install && npm run dev
+cd frontend/hosted-checkout && npm install && npm run dev
 ```
 
-### Start Frontend
-```bash
-cd frontend/merchant-portal
-npm install && npm run dev
+> **Important:** All `mvn spring-boot:run -pl <module>` commands must run from the `backend/` directory.
 
-cd frontend/hosted-checkout
-npm install && npm run dev
+### Troubleshooting
+
+```powershell
+# View all container status
+docker compose -f docker-compose.full.yml ps
+
+# Check specific service logs
+docker compose -f docker-compose.full.yml logs -f config-server
+docker compose -f docker-compose.full.yml logs -f identity-service
+
+# Rebuild a single service
+docker compose -f docker-compose.full.yml up -d --build identity-service
 ```
+
+See [DEV-SETUP.md](DEV-SETUP.md) for the full developer guide.
 
 ## Services
 

@@ -644,8 +644,8 @@ curl -X POST http://localhost:8888/decrypt -d "AQBz7...encrypted..."
 # Stage 1: Build
 FROM maven:3.9-eclipse-temurin-17 AS builder
 WORKDIR /app
-COPY ../pom.xml ./pom.xml
-COPY ../common-lib ./common-lib
+COPY pom.xml .
+COPY common-lib ./common-lib
 COPY config-server ./config-server
 RUN mvn clean package -pl config-server -am -DskipTests
 

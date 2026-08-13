@@ -587,6 +587,11 @@ docker exec payflow-postgres psql -U payflow -c "\l"
 
 **Cause:** Kafka `auto.create.topics.enable=true` is set, so topics are created on first publish. No manual creation needed.
 
+### Zookeeper Marked Unhealthy
+
+**Cause:** Zookeeper's four-letter commands (like `ruok`) are disabled by default in newer versions.
+**Fix:** The compose file includes `KAFKA_OPTS: "-Dzookeeper.4lw.commands.whitelist=ruok,stat,srvr"` to whitelist them. If you still see this, restart the zookeeper container.
+
 ### Port Already in Use
 
 **Cause:** Previous instance still running.

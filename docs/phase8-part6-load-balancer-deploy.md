@@ -125,8 +125,6 @@ cd /opt/payflow
 
 # Create production compose file
 cat > docker-compose.prod.yml << 'EOF'
-version: '3.8'
-
 services:
   api-gateway:
     image: ${ECR_REGISTRY}/payflow-api-gateway:latest

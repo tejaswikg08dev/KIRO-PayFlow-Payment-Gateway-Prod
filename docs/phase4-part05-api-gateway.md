@@ -811,8 +811,8 @@ The full route configuration lives in Config Server's `api-gateway.yml` (see Sec
 # Stage 1: Build with Maven
 FROM maven:3.9-eclipse-temurin-17 AS builder
 WORKDIR /app
-COPY ../pom.xml ./pom.xml
-COPY ../common-lib ./common-lib
+COPY pom.xml .
+COPY common-lib ./common-lib
 COPY api-gateway ./api-gateway
 RUN mvn clean package -pl api-gateway -am -DskipTests
 

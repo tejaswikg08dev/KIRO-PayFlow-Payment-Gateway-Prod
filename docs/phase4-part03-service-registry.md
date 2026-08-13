@@ -260,8 +260,8 @@ eureka:
 # Stage 1: Build — uses full Maven image to compile
 FROM maven:3.9-eclipse-temurin-17 AS builder
 WORKDIR /app
-COPY ../pom.xml ./pom.xml
-COPY ../common-lib ./common-lib
+COPY pom.xml .
+COPY common-lib ./common-lib
 COPY service-registry ./service-registry
 RUN mvn clean package -pl service-registry -am -DskipTests
 
