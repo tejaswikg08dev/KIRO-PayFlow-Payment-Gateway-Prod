@@ -1,4 +1,4 @@
-# 🏗️ Phase 4 Part 6c: Identity Service — Controller & Tests
+# 🏗️ Phase 4 Part 6c: Identity Service — Controller, DTOs & Tests
 
 > **"An endpoint without tests is a promise without proof — trust nothing unverified."**
 
@@ -17,67 +17,96 @@
 
 ## 📖 Table of Contents
 
-1. [Overview](#1-overview)
-2. [DTOs — Request & Response Objects](#2-dtos--request--response-objects)
-3. [AuthController Implementation](#3-authcontroller-implementation)
-4. [GlobalExceptionHandler](#4-globalexceptionhandler)
-5. [Unit Tests with Mockito](#5-unit-tests-with-mockito)
-6. [Integration Tests with SpringBootTest](#6-integration-tests-with-springboottest)
-7. [curl Examples](#7-curl-examples)
-8. [Error Response Format](#8-error-response-format)
-9. [What You Learned](#9-what-you-learned)
+1. [Overview & Purpose](#1-overview--purpose)
+2. [Step-by-Step: DTOs (Request & Response Objects)](#2-step-by-step-dtos-request--response-objects)
+3. [Step-by-Step: AuthController](#3-step-by-step-authcontroller)
+4. [Step-by-Step: IdentityExceptionHandler](#4-step-by-step-identityexceptionhandler)
+5. [Step-by-Step: UserMapper](#5-step-by-step-usermapper)
+6. [Understanding the Tests](#6-understanding-the-tests)
+7. [Unit Tests: AuthServiceTest](#7-unit-tests-authservicetest)
+8. [Unit Tests: JwtServiceTest](#8-unit-tests-jwtservicetest)
+9. [Controller Tests: AuthControllerTest](#9-controller-tests-authcontrollertest)
+10. [Testing with curl](#10-testing-with-curl)
+11. [Error Response Format](#11-error-response-format)
+12. [How to Run & Verify](#12-how-to-run--verify)
+13. [What You Learned](#13-what-you-learned)
 
 ---
 
-## 1. Overview
+## 1. Overview & Purpose
 
-The controller layer ties everything together — it receives HTTP requests, validates input,
-delegates to the service layer, and returns structured responses.
+In **Part 6a** we built the data layer (entities, repositories, migrations).
+In **Part 6b** we built the brain (JwtService, AuthService, SecurityConfig).
+Now in **Part 6c** we build the **interface** — the HTTP layer that the outside world talks to.
 
-**Component Architecture:**
+### What We Build in This Part
+
+| Component | Purpose |
+|-----------|---------|
+| **DTOs** | Define what JSON goes IN (requests) and OUT (responses) |
+| **AuthController** | Receives HTTP requests, delegates to AuthService |
+| **IdentityExceptionHandler** | Converts Java exceptions to proper HTTP error responses |
+| **UserMapper** | Converts User entity to UserProfileResponse DTO |
+| **Tests** | Prove everything works correctly |
+
+### Layer Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    CONTROLLER LAYER                                  │
+│                    HTTP REQUEST FLOW                                 │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  HTTP Request                                                       │
+│  Client sends JSON                                                  │
 │       │                                                             │
 │       ▼                                                             │
-│  ┌──────────────────────┐                                           │
-│  │   AuthController     │  Receives request, validates input        │
-│  │   • register()       │                                           │
-│  │   • login()          │                                           │
-│  │   • refresh()        │                                           │
-│  │   • getProfile()     │                                           │
-│  └──────────┬───────────┘                                           │
-│             │                                                       │
-│             ▼                                                       │
-│  ┌──────────────────────┐                                           │
-│  │    AuthService       │  Business logic execution                 │
-│  └──────────┬───────────┘                                           │
-│             │                                                       │
-│             ▼                                                       │
-│  ┌──────────────────────┐     ┌──────────────────────────────┐     │
-│  │   UserRepository     │     │  GlobalExceptionHandler       │     │
-│  │   RefreshTokenRepo   │     │  Maps exceptions → HTTP codes │     │
-│  └──────────────────────┘     └──────────────────────────────┘     │
+│  ┌──────────────────────────────────────────────────────────┐      │
+│  │ SPRING MVC: Deserializes JSON → RegisterRequest object    │      │
+│  │             Runs @Valid validation annotations             │      │
+│  │             If invalid → MethodArgumentNotValidException  │      │
+│  └──────────────────────────┬───────────────────────────────┘      │
+│                             │ (valid request)                       │
+│                             ▼                                       │
+│  ┌──────────────────────────────────────────────────────────┐      │
+│  │ AuthController: Receives request, delegates to service    │      │
+│  │                 Wraps response in ApiResponse<T>          │      │
+│  │                 Sets HTTP status code (201, 200, etc.)    │      │
+│  └──────────────────────────┬───────────────────────────────┘      │
+│                             │                                       │
+│                             ▼                                       │
+│  ┌──────────────────────────────────────────────────────────┐      │
+│  │ AuthService: Business logic (from Part 6b)                │      │
+│  │              May throw DuplicateResourceException          │      │
+│  │              May throw UnauthorizedException               │      │
+│  └──────────────────────────┬───────────────────────────────┘      │
+│                             │ (exception thrown?)                    │
+│                             ▼                                       │
+│  ┌──────────────────────────────────────────────────────────┐      │
+│  │ IdentityExceptionHandler: Catches exceptions              │      │
+│  │                           Converts to JSON error response │      │
+│  │                           Sets appropriate HTTP status     │      │
+│  └──────────────────────────────────────────────────────────┘      │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-**Endpoint Summary:**
-
-| Method | Path | Auth Required | Description |
-|--------|------|:-------------:|-------------|
-| POST | `/v1/auth/register` | No | Create new account |
-| POST | `/v1/auth/login` | No | Authenticate user |
-| POST | `/v1/auth/refresh` | No | Rotate tokens |
-| GET | `/v1/auth/profile` | Yes (userId header) | Get current user profile |
-
 ---
 
-## 2. DTOs — Request & Response Objects
+## 2. Step-by-Step: DTOs (Request & Response Objects)
+
+### What Are DTOs and Why Do We Need Them?
+
+**DTO = Data Transfer Object** — a simple class that carries data between layers.
+
+**Why not just use the User entity directly?**
+
+| Problem with exposing entities | How DTOs solve it |
+|-------------------------------|-------------------|
+| Entity has `passwordHash` → leaked to client! | DTO only has fields the client should see |
+| Entity fields might not match what client sends | Request DTO has exactly what client provides |
+| Validation annotations clutter the entity | Validation lives on the DTO |
+| Entity changes → API changes (tight coupling) | DTO is the contract; entity can change freely |
+
+### RegisterRequest
 
 **File:** `backend/identity-service/src/main/java/com/payflow/identity/dto/RegisterRequest.java`
 
@@ -86,59 +115,57 @@ package com.payflow.identity.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * Request DTO for user registration.
- * Validates input before it reaches the service layer.
+ * 
+ * WHAT: Defines the JSON structure the client must send to /v1/auth/register
+ * WHY:  Separates API contract from internal entity structure
+ * HOW:  Jakarta validation annotations reject bad input BEFORE it hits the service
+ * 
+ * Example valid request:
+ * {
+ *   "fullName": "Tejaswi Kumar",
+ *   "email": "tejaswi@example.com",
+ *   "password": "MySecureP@ss1",
+ *   "role": "MERCHANT"
+ * }
  */
+@Data                // Lombok: getters, setters, toString, equals, hashCode
+@Builder             // Lombok: RegisterRequest.builder().email("x").build()
+@NoArgsConstructor   // Required for JSON deserialization (Jackson needs no-arg constructor)
+@AllArgsConstructor  // Required for @Builder
 public class RegisterRequest {
 
+    @NotBlank(message = "Full name is required")
+    // @NotBlank rejects: null, "", "   " (empty or whitespace-only)
+    @Size(min = 2, max = 100)
+    // Between 2 and 100 characters
+    private String fullName;
+
     @NotBlank(message = "Email is required")
-    @Email(message = "Must be a valid email address")
+    @Email(message = "Invalid email format")
+    // @Email validates: must contain @ and a domain. Rejects "notanemail"
     private String email;
 
     @NotBlank(message = "Password is required")
-    @Size(min = 8, max = 64, message = "Password must be between 8 and 64 characters")
-    @Pattern(
-        regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]+$",
-        message = "Password must contain uppercase, lowercase, digit, and special character"
-    )
+    @Size(min = 8, max = 100, message = "Password must be 8-100 characters")
+    // Minimum 8 chars for security. Maximum 100 to prevent BCrypt DoS
+    // (extremely long passwords take forever to hash).
     private String password;
 
-    @NotBlank(message = "Full name is required")
-    @Size(min = 2, max = 150, message = "Full name must be between 2 and 150 characters")
-    private String fullName;
-
-    @NotBlank(message = "Role is required")
-    @Pattern(regexp = "^(USER|MERCHANT|ADMIN)$", message = "Role must be USER, MERCHANT, or ADMIN")
     private String role;
-
-    // Constructors
-    public RegisterRequest() {}
-
-    public RegisterRequest(String email, String password, String fullName, String role) {
-        this.email = email;
-        this.password = password;
-        this.fullName = fullName;
-        this.role = role;
-    }
-
-    // Getters and Setters
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
-
-    public String getPassword() { return password; }
-    public void setPassword(String password) { this.password = password; }
-
-    public String getFullName() { return fullName; }
-    public void setFullName(String fullName) { this.fullName = fullName; }
-
-    public String getRole() { return role; }
-    public void setRole(String role) { this.role = role; }
+    // Optional — defaults to "USER" in AuthService if null
+    // Not @NotBlank because it's optional
 }
 ```
+
+### LoginRequest
 
 **File:** `backend/identity-service/src/main/java/com/payflow/identity/dto/LoginRequest.java`
 
@@ -147,30 +174,38 @@ package com.payflow.identity.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
+/**
+ * Request DTO for user login.
+ * 
+ * Example:
+ * {
+ *   "email": "tejaswi@example.com",
+ *   "password": "MySecureP@ss1"
+ * }
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class LoginRequest {
 
     @NotBlank(message = "Email is required")
-    @Email(message = "Must be a valid email address")
+    @Email(message = "Invalid email format")
     private String email;
 
     @NotBlank(message = "Password is required")
     private String password;
-
-    public LoginRequest() {}
-
-    public LoginRequest(String email, String password) {
-        this.email = email;
-        this.password = password;
-    }
-
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
-
-    public String getPassword() { return password; }
-    public void setPassword(String password) { this.password = password; }
+    // No @Size here — we don't reveal password requirements during login
+    // (that would help an attacker narrow down possible passwords)
 }
 ```
+
+### RefreshRequest
 
 **File:** `backend/identity-service/src/main/java/com/payflow/identity/dto/RefreshRequest.java`
 
@@ -178,189 +213,376 @@ public class LoginRequest {
 package com.payflow.identity.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
+/**
+ * Request DTO for token refresh.
+ * 
+ * Example:
+ * {
+ *   "refreshToken": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+ * }
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class RefreshRequest {
 
     @NotBlank(message = "Refresh token is required")
     private String refreshToken;
-
-    public RefreshRequest() {}
-
-    public RefreshRequest(String refreshToken) {
-        this.refreshToken = refreshToken;
-    }
-
-    public String getRefreshToken() { return refreshToken; }
-    public void setRefreshToken(String refreshToken) { this.refreshToken = refreshToken; }
 }
 ```
+
+### AuthResponse
 
 **File:** `backend/identity-service/src/main/java/com/payflow/identity/dto/AuthResponse.java`
 
 ```java
 package com.payflow.identity.dto;
 
-import java.util.UUID;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
- * Response returned after successful authentication (register or login).
+ * Response DTO returned after successful authentication (register/login/refresh).
+ * 
+ * Example response:
+ * {
+ *   "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+ *   "refreshToken": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+ *   "expiresIn": 900,
+ *   "user": {
+ *     "id": "uuid-123",
+ *     "email": "tejaswi@example.com",
+ *     "fullName": "Tejaswi Kumar",
+ *     "role": "MERCHANT",
+ *     "createdAt": "2024-01-15T10:30:00Z"
+ *   }
+ * }
  */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class AuthResponse {
 
     private String accessToken;
+    // JWT for authorizing API calls. Send as: Authorization: Bearer <accessToken>
+
     private String refreshToken;
-    private UUID userId;
-    private String tokenType;
+    // Opaque UUID token for getting new access tokens when this one expires
+
     private long expiresIn;
+    // Seconds until access token expires (900 = 15 minutes)
+    // Client uses this to know WHEN to refresh: setTimeout(refresh, expiresIn * 1000)
 
-    public AuthResponse(String accessToken, String refreshToken, UUID userId) {
-        this.accessToken = accessToken;
-        this.refreshToken = refreshToken;
-        this.userId = userId;
-        this.tokenType = "Bearer";
-        this.expiresIn = 900; // 15 minutes in seconds
-    }
-
-    // Getters
-    public String getAccessToken() { return accessToken; }
-    public String getRefreshToken() { return refreshToken; }
-    public UUID getUserId() { return userId; }
-    public String getTokenType() { return tokenType; }
-    public long getExpiresIn() { return expiresIn; }
+    private UserProfileResponse user;
+    // Basic user info — saves an extra API call to /profile after login
 }
 ```
+
+### UserProfileResponse
 
 **File:** `backend/identity-service/src/main/java/com/payflow/identity/dto/UserProfileResponse.java`
 
 ```java
 package com.payflow.identity.dto;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
+import java.time.Instant;
+
+/**
+ * Response DTO for user profile information.
+ * Used in AuthResponse (nested) and GET /v1/auth/profile (standalone).
+ * 
+ * NOTE: Does NOT include passwordHash, active status, or updatedAt.
+ * Only information the client/UI needs to display.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class UserProfileResponse {
 
-    private UUID id;
-    private String email;
-    private String fullName;
-    private String role;
-    private LocalDateTime createdAt;
-
-    public UserProfileResponse(UUID id, String email, String fullName,
-                               String role, LocalDateTime createdAt) {
-        this.id = id;
-        this.email = email;
-        this.fullName = fullName;
-        this.role = role;
-        this.createdAt = createdAt;
-    }
-
-    // Getters
-    public UUID getId() { return id; }
-    public String getEmail() { return email; }
-    public String getFullName() { return fullName; }
-    public String getRole() { return role; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
+    private String id;        // User's UUID
+    private String email;     // Display + contact
+    private String fullName;  // Display name in UI
+    private String role;      // "USER", "MERCHANT", or "ADMIN"
+    private Instant createdAt; // Account creation timestamp
 }
 ```
 
+### Validation Annotations Cheat Sheet
+
+| Annotation | What It Validates | Example |
+|------------|------------------|---------|
+| `@NotBlank` | Not null, not empty, not whitespace | Rejects: null, "", "   " |
+| `@Email` | Valid email format | Rejects: "abc", "@x", "a@" |
+| `@Size(min, max)` | String length within range | `@Size(min=8)` rejects "short" |
+| `@NotNull` | Not null (but empty string OK) | Rejects: null. Allows: "" |
+| `@Pattern` | Matches regex | `@Pattern(regexp="^(USER|MERCHANT)$")` |
+
 ---
 
-## 3. AuthController Implementation
+## 3. Step-by-Step: AuthController
 
 **File:** `backend/identity-service/src/main/java/com/payflow/identity/controller/AuthController.java`
+
+### What It Does
+The controller is the **entry point** for HTTP requests. It:
+1. Receives the HTTP request
+2. Deserializes JSON into Java objects
+3. Triggers validation (`@Valid`)
+4. Delegates to AuthService
+5. Wraps the result in `ApiResponse` and sets the HTTP status code
+
+### Why Controllers Should Be Thin
+Controllers should do ZERO business logic. Their only job is HTTP translation:
+- HTTP request → Java method call
+- Java return value → HTTP response
+
+All actual logic lives in the service layer. This makes business logic testable without HTTP.
+
+### Implementation (Matching Actual Source Code)
 
 ```java
 package com.payflow.identity.controller;
 
+import com.payflow.common.dto.ApiResponse;
 import com.payflow.identity.dto.*;
 import com.payflow.identity.service.AuthService;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.UUID;
-
 /**
- * REST controller for authentication operations.
+ * REST controller for authentication endpoints.
  * 
- * Base path: /v1/auth
- * All endpoints are publicly accessible (auth handled at gateway level).
+ * BASE PATH: /v1/auth
+ * 
+ * DESIGN:
+ * • Thin controller — delegates ALL logic to AuthService
+ * • Uses @Valid for input validation (triggers DTO annotations)
+ * • Wraps responses in ApiResponse<T> for consistent JSON structure
+ * • Uses common-lib's ApiResponse (shared across all microservices)
  */
-@RestController
-@RequestMapping("/v1/auth")
+@RestController                    // Handles HTTP requests, returns JSON (not views)
+@RequestMapping("/v1/auth")        // All endpoints start with /v1/auth
+@RequiredArgsConstructor           // Lombok: injects AuthService via constructor
 public class AuthController {
 
     private final AuthService authService;
 
-    public AuthController(AuthService authService) {
-        this.authService = authService;
-    }
+    // ═══════════════════════════════════════════════════════════════════
+    // POST /v1/auth/register
+    // ═══════════════════════════════════════════════════════════════════
 
     /**
-     * Register a new user account.
+     * Creates a new user account.
      * 
-     * POST /v1/auth/register
-     * Returns 201 CREATED with access + refresh tokens.
+     * REQUEST:
+     *   POST /v1/auth/register
+     *   Content-Type: application/json
+     *   Body: {"fullName": "...", "email": "...", "password": "...", "role": "..."}
+     * 
+     * RESPONSE (201 Created):
+     *   {
+     *     "success": true,
+     *     "data": {
+     *       "accessToken": "eyJ...",
+     *       "refreshToken": "uuid",
+     *       "expiresIn": 900,
+     *       "user": { ... }
+     *     }
+     *   }
+     * 
+     * ERROR CASES:
+     *   400 — Validation failed (missing/invalid fields)
+     *   409 — Email already registered
      */
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<ApiResponse<AuthResponse>> register(
+            @Valid @RequestBody RegisterRequest request) {
+        // @Valid: Triggers Jakarta validation annotations on RegisterRequest
+        //         If validation fails → MethodArgumentNotValidException → 400 response
+        // @RequestBody: Tells Spring to parse the HTTP body as JSON → RegisterRequest
+
         AuthResponse response = authService.register(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)   // 201 — resource was created
+                .body(ApiResponse.success(response));
+        // ApiResponse.success() wraps in: { "success": true, "data": { ... } }
     }
 
+    // ═══════════════════════════════════════════════════════════════════
+    // POST /v1/auth/login
+    // ═══════════════════════════════════════════════════════════════════
+
     /**
-     * Authenticate with email and password.
+     * Authenticates a user with email + password.
      * 
-     * POST /v1/auth/login
-     * Returns 200 OK with access + refresh tokens.
+     * REQUEST:
+     *   POST /v1/auth/login
+     *   Body: {"email": "...", "password": "..."}
+     * 
+     * RESPONSE (200 OK):
+     *   { "success": true, "data": { "accessToken": "...", ... } }
+     * 
+     * ERROR CASES:
+     *   400 — Validation failed
+     *   401 — Invalid email or password
      */
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<ApiResponse<AuthResponse>> login(
+            @Valid @RequestBody LoginRequest request) {
         AuthResponse response = authService.login(request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success(response));
+        // 200 OK — no resource was created, just returning existing data
     }
 
+    // ═══════════════════════════════════════════════════════════════════
+    // POST /v1/auth/refresh
+    // ═══════════════════════════════════════════════════════════════════
+
     /**
-     * Refresh an access token using a valid refresh token.
-     * Implements token rotation (old token revoked, new pair issued).
+     * Gets new tokens using a valid refresh token.
      * 
-     * POST /v1/auth/refresh
-     * Returns 200 OK with new access + refresh tokens.
+     * REQUEST:
+     *   POST /v1/auth/refresh
+     *   Body: {"refreshToken": "a1b2c3d4-e5f6-..."}
+     * 
+     * RESPONSE (200 OK):
+     *   { "success": true, "data": { "accessToken": "NEW", "refreshToken": "NEW", ... } }
+     * 
+     * ERROR CASES:
+     *   400 — Refresh token is blank
+     *   401 — Invalid, expired, or already-used refresh token
+     * 
+     * SECURITY: Implements token rotation (old token revoked, new one issued)
      */
     @PostMapping("/refresh")
-    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshRequest request) {
-        AuthResponse response = authService.refreshToken(request.getRefreshToken());
-        return ResponseEntity.ok(response);
+    public ResponseEntity<ApiResponse<AuthResponse>> refresh(
+            @Valid @RequestBody RefreshRequest request) {
+        AuthResponse response = authService.refreshToken(request);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    // ═══════════════════════════════════════════════════════════════════
+    // GET /v1/auth/profile
+    // ═══════════════════════════════════════════════════════════════════
+
     /**
-     * Get the profile of the authenticated user.
-     * The userId is passed by the API Gateway after JWT validation.
+     * Returns the profile of the authenticated user.
      * 
-     * GET /v1/auth/profile
-     * Header: X-User-Id (set by gateway)
-     * Returns 200 OK with user profile.
+     * HOW AUTHENTICATION WORKS FOR THIS ENDPOINT:
+     * 1. Client sends request with "Authorization: Bearer <JWT>" header
+     * 2. API Gateway validates the JWT (checks signature + expiry)
+     * 3. API Gateway extracts userId from JWT and adds "X-User-Id" header
+     * 4. Request reaches this endpoint with X-User-Id already set
+     * 5. We just look up the user by that ID
+     * 
+     * REQUEST:
+     *   GET /v1/auth/profile
+     *   Headers: X-User-Id: <userId>  (set by API Gateway)
+     * 
+     * RESPONSE (200 OK):
+     *   { "success": true, "data": { "id": "...", "email": "...", ... } }
+     * 
+     * WHY X-User-Id HEADER?
+     * → Single Responsibility: Gateway handles JWT validation
+     * → Performance: Validation happens once at gateway, not in every service
+     * → Simplicity: Downstream services just read a header, no JWT parsing
      */
     @GetMapping("/profile")
-    public ResponseEntity<UserProfileResponse> getProfile(
-            @RequestHeader("X-User-Id") UUID userId) {
-        UserProfileResponse response = authService.getProfile(userId);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<ApiResponse<UserProfileResponse>> getProfile(
+            @RequestHeader("X-User-Id") String userId) {
+        // @RequestHeader: Extracts the X-User-Id HTTP header value
+        UserProfileResponse profile = authService.getProfile(userId);
+        return ResponseEntity.ok(ApiResponse.success(profile));
     }
+}
+```
+
+### Endpoint Summary
+
+| Method | Path | Auth? | Status Codes | Description |
+|--------|------|:-----:|-------------|-------------|
+| POST | `/v1/auth/register` | No | 201, 400, 409 | Create new account |
+| POST | `/v1/auth/login` | No | 200, 400, 401 | Authenticate |
+| POST | `/v1/auth/refresh` | No | 200, 400, 401 | Rotate tokens |
+| GET | `/v1/auth/profile` | Yes* | 200, 404 | Get user profile |
+
+*Auth is handled by API Gateway via X-User-Id header, not by this service directly.
+
+### Why `ApiResponse<T>` Wrapper?
+
+Instead of returning raw objects, we wrap in `ApiResponse`:
+
+```json
+// SUCCESS:
+{
+  "success": true,
+  "data": { ... actual response ... }
+}
+
+// ERROR:
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Request validation failed",
+    "details": [ ... ]
+  }
+}
+```
+
+**Why?** Consistent structure makes it easy for the frontend to handle responses:
+```javascript
+const result = await fetch("/v1/auth/login", ...);
+const json = await result.json();
+if (json.success) {
+  // Use json.data
+} else {
+  // Show json.error.message
 }
 ```
 
 ---
 
-## 4. GlobalExceptionHandler
+## 4. Step-by-Step: IdentityExceptionHandler
 
-**File:** `backend/identity-service/src/main/java/com/payflow/identity/exception/GlobalExceptionHandler.java`
+**File:** `backend/identity-service/src/main/java/com/payflow/identity/exception/IdentityExceptionHandler.java`
+
+### What It Does
+Catches exceptions thrown anywhere in the service and converts them to proper HTTP error responses. Without this, Spring would return ugly HTML error pages.
+
+### Why It's Important
+- Frontend needs **consistent JSON** error format (not HTML)
+- HTTP status codes must be **meaningful** (409 for duplicate, 401 for unauthorized)
+- Internal details must **NEVER leak** to clients (no stack traces)
+
+### Implementation (Matching Actual Source Code)
 
 ```java
 package com.payflow.identity.exception;
 
+import com.payflow.common.dto.ApiResponse;
+import com.payflow.common.dto.ErrorResponse;
+import com.payflow.common.dto.ValidationError;
+import com.payflow.common.exception.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -368,142 +590,267 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 
 /**
- * Global exception handler that maps service exceptions to HTTP responses.
- * Provides consistent error response format across all endpoints.
+ * Global exception handler for identity-service.
+ * Converts exceptions into structured API error responses.
+ * 
+ * HOW IT WORKS:
+ * 1. Controller method throws an exception (e.g., DuplicateResourceException)
+ * 2. Spring intercepts it BEFORE returning to the client
+ * 3. Finds the matching @ExceptionHandler method here
+ * 4. Returns the structured error response instead
+ * 
+ * WHY @RestControllerAdvice?
+ * → Applies to ALL controllers in this service automatically
+ * → No try-catch blocks needed in controllers
+ * → Centralized error formatting
  */
 @RestControllerAdvice
-public class GlobalExceptionHandler {
+public class IdentityExceptionHandler {
 
     /**
-     * Handles duplicate email registration attempts.
-     * Maps to 409 CONFLICT.
+     * DUPLICATE EMAIL (409 CONFLICT)
+     * 
+     * Triggered when: User tries to register with an email that already exists
+     * Source: AuthService.register() → DuplicateResourceException
+     * 
+     * Example response:
+     * HTTP 409
+     * { "success": false, "error": { "code": "DUPLICATE_RESOURCE", "message": "User with email 'x@y.com' already exists" } }
      */
-    @ExceptionHandler(DuplicateEmailException.class)
-    public ResponseEntity<ErrorResponse> handleDuplicateEmail(DuplicateEmailException ex) {
-        ErrorResponse error = new ErrorResponse(
-            HttpStatus.CONFLICT.value(),
-            "DUPLICATE_EMAIL",
-            ex.getMessage(),
-            LocalDateTime.now()
-        );
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    @ExceptionHandler(DuplicateResourceException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDuplicate(DuplicateResourceException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(ErrorResponse.of(ex.getErrorCode(), ex.getMessage())));
     }
 
     /**
-     * Handles invalid login credentials.
-     * Maps to 401 UNAUTHORIZED.
-     * Note: intentionally vague message to prevent user enumeration.
+     * UNAUTHORIZED (401)
+     * 
+     * Triggered when: Wrong password, invalid token, expired token, disabled account
+     * Source: AuthService.login(), AuthService.refreshToken()
+     * 
+     * SECURITY: Message is intentionally vague for login failures
+     * to prevent user enumeration.
+     * 
+     * Example response:
+     * HTTP 401
+     * { "success": false, "error": { "code": "UNAUTHORIZED", "message": "Invalid email or password" } }
      */
-    @ExceptionHandler(InvalidCredentialsException.class)
-    public ResponseEntity<ErrorResponse> handleInvalidCredentials(InvalidCredentialsException ex) {
-        ErrorResponse error = new ErrorResponse(
-            HttpStatus.UNAUTHORIZED.value(),
-            "INVALID_CREDENTIALS",
-            "Invalid email or password",
-            LocalDateTime.now()
-        );
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnauthorized(UnauthorizedException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error(ErrorResponse.of(ex.getErrorCode(), ex.getMessage())));
     }
 
     /**
-     * Handles invalid or expired tokens.
-     * Maps to 401 UNAUTHORIZED.
+     * NOT FOUND (404)
+     * 
+     * Triggered when: User ID from header doesn't exist (profile endpoint)
+     * Source: AuthService.getProfile()
+     * 
+     * Example response:
+     * HTTP 404
+     * { "success": false, "error": { "code": "NOT_FOUND", "message": "User not found" } }
      */
-    @ExceptionHandler(InvalidTokenException.class)
-    public ResponseEntity<ErrorResponse> handleInvalidToken(InvalidTokenException ex) {
-        ErrorResponse error = new ErrorResponse(
-            HttpStatus.UNAUTHORIZED.value(),
-            "INVALID_TOKEN",
-            ex.getMessage(),
-            LocalDateTime.now()
-        );
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNotFound(ResourceNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(ErrorResponse.of(ex.getErrorCode(), ex.getMessage())));
     }
 
     /**
-     * Handles Bean Validation errors (@Valid annotation failures).
-     * Maps to 400 BAD_REQUEST with field-level error details.
+     * VALIDATION ERRORS (400 BAD REQUEST)
+     * 
+     * Triggered when: @Valid fails on request DTO
+     * Source: Spring MVC (automatic, before controller code runs)
+     * 
+     * Example: RegisterRequest with email = "notanemail" and password = "short"
+     * 
+     * Example response:
+     * HTTP 400
+     * {
+     *   "success": false,
+     *   "error": {
+     *     "code": "VALIDATION_ERROR",
+     *     "message": "Request validation failed",
+     *     "details": [
+     *       { "field": "email", "message": "Invalid email format", "rejectedValue": "notanemail" },
+     *       { "field": "password", "message": "Password must be 8-100 characters", "rejectedValue": "short" }
+     *     ]
+     *   }
+     * }
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ValidationErrorResponse> handleValidation(
-            MethodArgumentNotValidException ex) {
-        Map<String, String> fieldErrors = new HashMap<>();
-        for (FieldError fieldError : ex.getBindingResult().getFieldErrors()) {
-            fieldErrors.put(fieldError.getField(), fieldError.getDefaultMessage());
-        }
-
-        ValidationErrorResponse error = new ValidationErrorResponse(
-            HttpStatus.BAD_REQUEST.value(),
-            "VALIDATION_FAILED",
-            "Request validation failed",
-            fieldErrors,
-            LocalDateTime.now()
-        );
-        return ResponseEntity.badRequest().body(error);
+    public ResponseEntity<ApiResponse<Void>> handleValidation(MethodArgumentNotValidException ex) {
+        List<ValidationError> details = ex.getBindingResult().getFieldErrors().stream()
+                .map(this::mapFieldError)
+                .toList();
+        ErrorResponse error = ErrorResponse.withDetails(
+                "VALIDATION_ERROR", "Request validation failed", details);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(error));
     }
 
     /**
-     * Catch-all handler for unexpected exceptions.
-     * Maps to 500 INTERNAL_SERVER_ERROR.
-     * Never expose internal details to clients.
+     * CATCH-ALL (500 INTERNAL SERVER ERROR)
+     * 
+     * Triggered when: Any unexpected exception (NullPointerException, DB errors, etc.)
+     * 
+     * SECURITY: NEVER expose internal details to clients!
+     * Log the real error server-side, return generic message to client.
+     * 
+     * Example response:
+     * HTTP 500
+     * { "success": false, "error": { "code": "INTERNAL_ERROR", "message": "An unexpected error occurred" } }
      */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGeneral(Exception ex) {
-        ErrorResponse error = new ErrorResponse(
-            HttpStatus.INTERNAL_SERVER_ERROR.value(),
-            "INTERNAL_ERROR",
-            "An unexpected error occurred",
-            LocalDateTime.now()
-        );
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+    public ResponseEntity<ApiResponse<Void>> handleGeneral(Exception ex) {
+        // In production, also log the real exception:
+        // log.error("Unexpected error", ex);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error(ErrorResponse.of("INTERNAL_ERROR",
+                        "An unexpected error occurred")));
+    }
+
+    // ─── Helper ─────────────────────────────────────────────────────
+
+    private ValidationError mapFieldError(FieldError fieldError) {
+        return ValidationError.builder()
+                .field(fieldError.getField())
+                .message(fieldError.getDefaultMessage())
+                .rejectedValue(fieldError.getRejectedValue())
+                .build();
     }
 }
 ```
 
-**Error Response Records:**
+### Exception → HTTP Status Mapping
+
+| Exception | HTTP Status | Error Code | When |
+|-----------|:-----------:|------------|------|
+| `DuplicateResourceException` | 409 Conflict | DUPLICATE_RESOURCE | Email already registered |
+| `UnauthorizedException` | 401 Unauthorized | UNAUTHORIZED | Wrong password, invalid token |
+| `ResourceNotFoundException` | 404 Not Found | NOT_FOUND | User ID doesn't exist |
+| `MethodArgumentNotValidException` | 400 Bad Request | VALIDATION_ERROR | @Valid failed |
+| `Exception` (catch-all) | 500 Internal Server Error | INTERNAL_ERROR | Unexpected bugs |
+
+---
+
+## 5. Step-by-Step: UserMapper
+
+**File:** `backend/identity-service/src/main/java/com/payflow/identity/mapper/UserMapper.java`
+
+### What It Does
+MapStruct generates code at **compile time** to convert a `User` entity to a `UserProfileResponse` DTO.
+
+### Why Use MapStruct Instead of Manual Mapping?
+
+| Manual | MapStruct |
+|--------|-----------|
+| Write `new UserProfileResponse(user.getId(), user.getEmail(), ...)` everywhere | Write mapping interface once, reuse everywhere |
+| If you add a field to DTO, you might forget to map it | Compiler warns about unmapped fields |
+| Runtime errors if mapping is wrong | Compile-time errors |
+
+### Implementation
 
 ```java
-package com.payflow.identity.exception;
+package com.payflow.identity.mapper;
 
-import java.time.LocalDateTime;
-import java.util.Map;
+import com.payflow.identity.dto.UserProfileResponse;
+import com.payflow.identity.model.User;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
-public record ErrorResponse(
-    int status,
-    String code,
-    String message,
-    LocalDateTime timestamp
-) {}
+/**
+ * MapStruct mapper for User → UserProfileResponse conversion.
+ * 
+ * At compile time, MapStruct generates an implementation class
+ * (UserMapperImpl) that does the field-by-field copying.
+ * 
+ * WHY @Mapping for role?
+ * • User.role is type Role (enum)
+ * • UserProfileResponse.role is type String
+ * • We need to call .name() to convert enum → String
+ */
+@Mapper(componentModel = "spring")
+// componentModel = "spring": Makes this a Spring bean, injectable with @Autowired
+public interface UserMapper {
 
-public record ValidationErrorResponse(
-    int status,
-    String code,
-    String message,
-    Map<String, String> fieldErrors,
-    LocalDateTime timestamp
-) {}
+    @Mapping(target = "role", expression = "java(user.getRole().name())")
+    // Custom mapping: Role.MERCHANT → "MERCHANT" string
+    UserProfileResponse toProfileResponse(User user);
+    
+    // MapStruct auto-maps matching field names:
+    // user.getId()        → response.setId()        ✓ (same name + type)
+    // user.getEmail()     → response.setEmail()     ✓
+    // user.getFullName()  → response.setFullName()  ✓
+    // user.getCreatedAt() → response.setCreatedAt() ✓
+    // user.getRole()      → response.setRole()      ✗ (Role vs String — needs @Mapping)
+}
 ```
 
 ---
 
-## 5. Unit Tests with Mockito
+## 6. Understanding the Tests
+
+### Test Types in This Project
+
+| Test Type | What It Tests | Dependencies | Speed |
+|-----------|--------------|-------------|-------|
+| **Unit test** (AuthServiceTest) | Business logic in isolation | Mocked repos, mocked JWT | Very fast |
+| **Unit test** (JwtServiceTest) | JWT generation/validation | None (uses reflection for config) | Very fast |
+| **Controller test** (AuthControllerTest) | HTTP layer + validation | Mocked AuthService, real Spring MVC | Fast |
+| **Integration test** | Full flow with real DB | Testcontainers PostgreSQL | Slower |
+
+### Testing Pyramid
+
+```
+         ┌───────────┐
+         │Integration│  ← Few: expensive, slow, but prove full flow works
+         │   Tests   │
+        ┌┴───────────┴┐
+        │ Controller   │  ← Some: verify HTTP status codes, validation
+        │   Tests      │
+       ┌┴──────────────┴┐
+       │  Unit Tests     │  ← Many: fast, isolated, test every edge case
+       │(Service + JWT)  │
+       └────────────────┘
+```
+
+---
+
+## 7. Unit Tests: AuthServiceTest
 
 **File:** `backend/identity-service/src/test/java/com/payflow/identity/service/AuthServiceTest.java`
+
+### What It Tests
+The AuthService business logic in **complete isolation** — no database, no web server, no JWT library. Everything is mocked.
+
+### How Mocking Works
+
+```
+PRODUCTION:
+  AuthService → calls → UserRepository → calls → PostgreSQL
+
+UNIT TEST:
+  AuthService → calls → MockUserRepository → returns fake data (no DB!)
+```
+
+This means:
+- Tests run in milliseconds (no DB startup)
+- Tests are deterministic (no flaky network/DB issues)
+- Each test verifies ONE specific behavior
+
+### Implementation (Matching Actual Source Code)
 
 ```java
 package com.payflow.identity.service;
 
-import com.payflow.identity.dto.AuthResponse;
-import com.payflow.identity.dto.LoginRequest;
-import com.payflow.identity.dto.RegisterRequest;
-import com.payflow.identity.exception.DuplicateEmailException;
-import com.payflow.identity.exception.InvalidCredentialsException;
-import com.payflow.identity.exception.InvalidTokenException;
+import com.payflow.common.exception.DuplicateResourceException;
+import com.payflow.common.exception.UnauthorizedException;
+import com.payflow.identity.dto.*;
 import com.payflow.identity.model.RefreshToken;
 import com.payflow.identity.model.Role;
 import com.payflow.identity.model.User;
@@ -511,7 +858,6 @@ import com.payflow.identity.repository.RefreshTokenRepository;
 import com.payflow.identity.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -519,9 +865,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -529,402 +875,578 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
+/**
+ * Unit tests for AuthService.
+ * 
+ * WHAT: Tests each business logic path in isolation.
+ * HOW: Uses Mockito to replace real dependencies with controllable fakes.
+ * WHY: Fast feedback, tests every edge case without infrastructure.
+ * 
+ * PATTERN: Given-When-Then (Arrange-Act-Assert)
+ *   Given: Set up preconditions (mock returns)
+ *   When:  Call the method under test
+ *   Then:  Verify the result and interactions
+ */
+@ExtendWith(MockitoExtension.class)  // Activates @Mock and @InjectMocks
+@DisplayName("AuthService Unit Tests")
 class AuthServiceTest {
 
     @Mock private UserRepository userRepository;
+    // Fake UserRepository — returns whatever we tell it to
+
     @Mock private RefreshTokenRepository refreshTokenRepository;
     @Mock private JwtService jwtService;
     @Mock private PasswordEncoder passwordEncoder;
 
-    private AuthService authService;
+    @InjectMocks private AuthService authService;
+    // Creates real AuthService, injecting all the @Mock objects above
+
+    private User testUser;
+    private RegisterRequest registerRequest;
+    private LoginRequest loginRequest;
 
     @BeforeEach
     void setUp() {
-        authService = new AuthService(
-            userRepository, refreshTokenRepository,
-            jwtService, passwordEncoder, 7L
-        );
+        // Create a reusable test user
+        testUser = User.builder()
+                .id("user-123")
+                .email("john@example.com")
+                .passwordHash("encoded-password")
+                .fullName("John Doe")
+                .role(Role.USER)
+                .active(true)
+                .createdAt(Instant.now())
+                .build();
+
+        registerRequest = RegisterRequest.builder()
+                .email("john@example.com")
+                .password("password123")
+                .fullName("John Doe")
+                .build();
+
+        loginRequest = LoginRequest.builder()
+                .email("john@example.com")
+                .password("password123")
+                .build();
     }
 
-    @Nested
-    @DisplayName("Registration Tests")
-    class RegisterTests {
+    // ═══ REGISTRATION TESTS ═══════════════════════════════════════════
 
-        @Test
-        @DisplayName("Should register user successfully")
-        void register_Success() {
-            // Given
-            RegisterRequest request = new RegisterRequest(
-                "john@example.com", "P@ssw0rd!", "John Doe", "USER"
-            );
-            User savedUser = new User("john@example.com", "hashed", "John Doe", Role.USER);
+    @Test
+    @DisplayName("register - should create user and return auth response")
+    void register_Success() {
+        // GIVEN: Email doesn't exist, password encoder works, save succeeds
+        when(userRepository.existsByEmail(registerRequest.getEmail())).thenReturn(false);
+        when(passwordEncoder.encode(registerRequest.getPassword())).thenReturn("encoded-password");
+        when(userRepository.save(any(User.class))).thenReturn(testUser);
+        when(jwtService.generateAccessToken(anyString(), anyString(), anyString()))
+                .thenReturn("access-token-123");
+        when(jwtService.getAccessTokenExpirationSeconds()).thenReturn(3600L);
+        when(refreshTokenRepository.save(any(RefreshToken.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
-            when(userRepository.existsByEmail(anyString())).thenReturn(false);
-            when(passwordEncoder.encode(anyString())).thenReturn("hashed");
-            when(userRepository.save(any(User.class))).thenReturn(savedUser);
-            when(jwtService.generateAccessToken(any(User.class))).thenReturn("access-token");
-            when(refreshTokenRepository.save(any(RefreshToken.class)))
-                .thenAnswer(inv -> inv.getArgument(0));
+        // WHEN: We call register
+        AuthResponse response = authService.register(registerRequest);
 
-            // When
-            AuthResponse response = authService.register(request);
+        // THEN: Response has tokens and user info
+        assertThat(response).isNotNull();
+        assertThat(response.getAccessToken()).isEqualTo("access-token-123");
+        assertThat(response.getRefreshToken()).isNotBlank();
+        assertThat(response.getExpiresIn()).isEqualTo(3600L);
+        assertThat(response.getUser().getEmail()).isEqualTo("john@example.com");
 
-            // Then
-            assertThat(response.getAccessToken()).isEqualTo("access-token");
-            assertThat(response.getRefreshToken()).isNotBlank();
-            verify(userRepository).save(any(User.class));
-            verify(passwordEncoder).encode("P@ssw0rd!");
-        }
-
-        @Test
-        @DisplayName("Should throw DuplicateEmailException when email exists")
-        void register_DuplicateEmail() {
-            // Given
-            RegisterRequest request = new RegisterRequest(
-                "existing@example.com", "P@ssw0rd!", "Jane", "USER"
-            );
-            when(userRepository.existsByEmail("existing@example.com")).thenReturn(true);
-
-            // When/Then
-            assertThatThrownBy(() -> authService.register(request))
-                .isInstanceOf(DuplicateEmailException.class);
-            verify(userRepository, never()).save(any());
-        }
+        // VERIFY: Correct methods were called
+        verify(userRepository).save(any(User.class));           // User was persisted
+        verify(refreshTokenRepository).save(any(RefreshToken.class)); // Token was persisted
     }
 
-    @Nested
-    @DisplayName("Login Tests")
-    class LoginTests {
+    @Test
+    @DisplayName("register - should throw DuplicateResourceException for existing email")
+    void register_DuplicateEmail_Throws() {
+        // GIVEN: Email already exists
+        when(userRepository.existsByEmail(registerRequest.getEmail())).thenReturn(true);
 
-        @Test
-        @DisplayName("Should login successfully with valid credentials")
-        void login_Success() {
-            // Given
-            LoginRequest request = new LoginRequest("john@example.com", "P@ssw0rd!");
-            User user = new User("john@example.com", "hashed", "John Doe", Role.USER);
+        // WHEN/THEN: Exception is thrown
+        assertThatThrownBy(() -> authService.register(registerRequest))
+                .isInstanceOf(DuplicateResourceException.class);
 
-            when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.of(user));
-            when(passwordEncoder.matches("P@ssw0rd!", "hashed")).thenReturn(true);
-            when(jwtService.generateAccessToken(user)).thenReturn("access-token");
-            when(refreshTokenRepository.save(any(RefreshToken.class)))
-                .thenAnswer(inv -> inv.getArgument(0));
-
-            // When
-            AuthResponse response = authService.login(request);
-
-            // Then
-            assertThat(response.getAccessToken()).isEqualTo("access-token");
-        }
-
-        @Test
-        @DisplayName("Should throw InvalidCredentialsException for wrong password")
-        void login_WrongPassword() {
-            // Given
-            LoginRequest request = new LoginRequest("john@example.com", "wrong");
-            User user = new User("john@example.com", "hashed", "John", Role.USER);
-
-            when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.of(user));
-            when(passwordEncoder.matches("wrong", "hashed")).thenReturn(false);
-
-            // When/Then
-            assertThatThrownBy(() -> authService.login(request))
-                .isInstanceOf(InvalidCredentialsException.class);
-        }
-
-        @Test
-        @DisplayName("Should throw InvalidCredentialsException for unknown email")
-        void login_UnknownEmail() {
-            // Given
-            LoginRequest request = new LoginRequest("unknown@example.com", "pass");
-            when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
-
-            // When/Then
-            assertThatThrownBy(() -> authService.login(request))
-                .isInstanceOf(InvalidCredentialsException.class);
-        }
+        // VERIFY: Nothing was saved (registration aborted early)
+        verify(userRepository, never()).save(any(User.class));
     }
 
-    @Nested
-    @DisplayName("Token Refresh Tests")
-    class RefreshTests {
+    // ═══ LOGIN TESTS ══════════════════════════════════════════════════
 
-        @Test
-        @DisplayName("Should detect reuse of revoked token and invalidate all sessions")
-        void refresh_ReuseDetection() {
-            // Given — a token that was already revoked
-            UUID userId = UUID.randomUUID();
-            RefreshToken revokedToken = new RefreshToken("old-token", userId,
-                LocalDateTime.now().plusDays(7));
-            revokedToken.revoke();
+    @Test
+    @DisplayName("login - should return auth response for valid credentials")
+    void login_Success() {
+        // GIVEN: User exists and password matches
+        when(userRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches(loginRequest.getPassword(), testUser.getPasswordHash()))
+                .thenReturn(true);
+        when(jwtService.generateAccessToken(anyString(), anyString(), anyString()))
+                .thenReturn("access-token-456");
+        when(jwtService.getAccessTokenExpirationSeconds()).thenReturn(3600L);
+        when(refreshTokenRepository.save(any(RefreshToken.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
-            when(refreshTokenRepository.findByToken("old-token"))
-                .thenReturn(Optional.of(revokedToken));
+        // WHEN
+        AuthResponse response = authService.login(loginRequest);
 
-            // When/Then
-            assertThatThrownBy(() -> authService.refreshToken("old-token"))
-                .isInstanceOf(InvalidTokenException.class)
-                .hasMessageContaining("reuse detected");
+        // THEN
+        assertThat(response).isNotNull();
+        assertThat(response.getAccessToken()).isEqualTo("access-token-456");
+        assertThat(response.getUser().getEmail()).isEqualTo("john@example.com");
+    }
 
-            // Verify all tokens for this user are revoked
-            verify(refreshTokenRepository).revokeAllByUserId(userId);
-        }
+    @Test
+    @DisplayName("login - should throw UnauthorizedException for wrong password")
+    void login_WrongPassword_Throws() {
+        // GIVEN: User exists but password doesn't match
+        when(userRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches(loginRequest.getPassword(), testUser.getPasswordHash()))
+                .thenReturn(false);  // Password mismatch!
+
+        // WHEN/THEN
+        assertThatThrownBy(() -> authService.login(loginRequest))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessageContaining("Invalid email or password");
+    }
+
+    // ═══ TOKEN REFRESH TESTS ══════════════════════════════════════════
+
+    @Test
+    @DisplayName("refreshToken - should generate new tokens with valid refresh token")
+    void refreshToken_Success() {
+        // GIVEN: Valid non-expired, non-revoked token exists
+        RefreshToken existingToken = RefreshToken.builder()
+                .id("token-id-1")
+                .token("valid-refresh-token")
+                .userId("user-123")
+                .expiresAt(Instant.now().plus(7, ChronoUnit.DAYS))
+                .revoked(false)
+                .build();
+
+        RefreshRequest refreshRequest = new RefreshRequest();
+        refreshRequest.setRefreshToken("valid-refresh-token");
+
+        when(refreshTokenRepository.findByTokenAndRevokedFalse("valid-refresh-token"))
+                .thenReturn(Optional.of(existingToken));
+        when(refreshTokenRepository.save(any(RefreshToken.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.findById("user-123")).thenReturn(Optional.of(testUser));
+        when(jwtService.generateAccessToken(anyString(), anyString(), anyString()))
+                .thenReturn("new-access-token");
+        when(jwtService.getAccessTokenExpirationSeconds()).thenReturn(3600L);
+
+        // WHEN
+        AuthResponse response = authService.refreshToken(refreshRequest);
+
+        // THEN
+        assertThat(response).isNotNull();
+        assertThat(response.getAccessToken()).isEqualTo("new-access-token");
+        assertThat(response.getRefreshToken()).isNotBlank();
+
+        // VERIFY: Old token was revoked + new token was saved
+        verify(refreshTokenRepository, times(2)).save(any(RefreshToken.class));
+    }
+
+    @Test
+    @DisplayName("refreshToken - should throw UnauthorizedException for expired token")
+    void refreshToken_ExpiredToken_Throws() {
+        // GIVEN: Token exists but expired yesterday
+        RefreshToken expiredToken = RefreshToken.builder()
+                .id("token-id-2")
+                .token("expired-refresh-token")
+                .userId("user-123")
+                .expiresAt(Instant.now().minus(1, ChronoUnit.DAYS))  // EXPIRED
+                .revoked(false)
+                .build();
+
+        RefreshRequest refreshRequest = new RefreshRequest();
+        refreshRequest.setRefreshToken("expired-refresh-token");
+
+        when(refreshTokenRepository.findByTokenAndRevokedFalse("expired-refresh-token"))
+                .thenReturn(Optional.of(expiredToken));
+
+        // WHEN/THEN
+        assertThatThrownBy(() -> authService.refreshToken(refreshRequest))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessageContaining("Refresh token expired");
     }
 }
 ```
 
+### Key Testing Concepts
+
+| Concept | What It Means | Example |
+|---------|--------------|---------|
+| `@Mock` | Creates a fake implementation | `@Mock UserRepository` → fake that returns nothing by default |
+| `@InjectMocks` | Creates real object with mocks injected | `@InjectMocks AuthService` → real service with fake dependencies |
+| `when().thenReturn()` | "When this method is called, return this value" | `when(repo.findByEmail("x")).thenReturn(Optional.of(user))` |
+| `verify()` | Assert that a method was called | `verify(repo).save(any())` → "save() must have been called" |
+| `verify(never())` | Assert a method was NOT called | `verify(repo, never()).save(any())` → "save() must NOT have been called" |
+| `assertThatThrownBy()` | Assert that an exception is thrown | Checks both exception type and message |
+
 ---
 
-## 6. Integration Tests with SpringBootTest
+## 8. Unit Tests: JwtServiceTest
 
-**File:** `backend/identity-service/src/test/java/com/payflow/identity/controller/AuthControllerIntegrationTest.java`
+**File:** `backend/identity-service/src/test/java/com/payflow/identity/service/JwtServiceTest.java`
+
+### What It Tests
+JWT token generation and validation — without any Spring context or mocking.
 
 ```java
-package com.payflow.identity.controller;
+@DisplayName("JwtService Unit Tests")
+class JwtServiceTest {
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.payflow.identity.dto.LoginRequest;
-import com.payflow.identity.dto.RegisterRequest;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+    private JwtService jwtService;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-
-@SpringBootTest
-@AutoConfigureMockMvc
-@Testcontainers
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-class AuthControllerIntegrationTest {
-
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
-        .withDatabaseName("payflow_identity_test")
-        .withUsername("test")
-        .withPassword("test");
-
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-    }
-
-    @Autowired private MockMvc mockMvc;
-    @Autowired private ObjectMapper objectMapper;
-
-    @Test
-    @Order(1)
-    @DisplayName("POST /register — should create account and return tokens")
-    void register_Success() throws Exception {
-        RegisterRequest request = new RegisterRequest(
-            "integration@test.com", "P@ssw0rd!123", "Test User", "MERCHANT"
-        );
-
-        mockMvc.perform(post("/v1/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.accessToken").isNotEmpty())
-            .andExpect(jsonPath("$.refreshToken").isNotEmpty())
-            .andExpect(jsonPath("$.userId").isNotEmpty())
-            .andExpect(jsonPath("$.tokenType").value("Bearer"))
-            .andExpect(jsonPath("$.expiresIn").value(900));
+    @BeforeEach
+    void setUp() {
+        jwtService = new JwtService();
+        // Use reflection to set @Value fields (normally injected by Spring)
+        ReflectionTestUtils.setField(jwtService, "jwtSecret",
+                "payflow-test-secret-key-that-is-at-least-32-bytes-long-for-hmac");
+        ReflectionTestUtils.setField(jwtService, "accessTokenExpiration", 3600000L);
+        ReflectionTestUtils.setField(jwtService, "refreshTokenExpiration", 604800000L);
     }
 
     @Test
-    @Order(2)
-    @DisplayName("POST /register — should return 409 for duplicate email")
-    void register_DuplicateEmail() throws Exception {
-        RegisterRequest request = new RegisterRequest(
-            "integration@test.com", "P@ssw0rd!123", "Test User", "MERCHANT"
-        );
+    @DisplayName("generateAccessToken - should return a valid JWT with 3 parts")
+    void generateAccessToken_ReturnsNonNull() {
+        String token = jwtService.generateAccessToken("user-123", "john@example.com", "USER");
 
-        mockMvc.perform(post("/v1/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isConflict())
-            .andExpect(jsonPath("$.code").value("DUPLICATE_EMAIL"));
+        assertThat(token).isNotNull().isNotBlank();
+        assertThat(token.split("\\.")).hasSize(3);  // header.payload.signature
     }
 
     @Test
-    @Order(3)
-    @DisplayName("POST /login — should authenticate and return tokens")
-    void login_Success() throws Exception {
-        LoginRequest request = new LoginRequest("integration@test.com", "P@ssw0rd!123");
-
-        mockMvc.perform(post("/v1/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.accessToken").isNotEmpty())
-            .andExpect(jsonPath("$.refreshToken").isNotEmpty());
+    @DisplayName("extractUserId - should return the subject from the token")
+    void extractUserId_ReturnsCorrectSubject() {
+        String token = jwtService.generateAccessToken("user-456", "jane@example.com", "MERCHANT");
+        String userId = jwtService.extractUserId(token);
+        assertThat(userId).isEqualTo("user-456");
     }
 
     @Test
-    @Order(4)
-    @DisplayName("POST /login — should return 401 for wrong password")
-    void login_WrongPassword() throws Exception {
-        LoginRequest request = new LoginRequest("integration@test.com", "WrongPass1!");
-
-        mockMvc.perform(post("/v1/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isUnauthorized())
-            .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+    @DisplayName("isTokenValid - should return false for expired token")
+    void isTokenValid_WithExpiredToken_ReturnsFalse() {
+        // Set expiration to negative (already expired)
+        ReflectionTestUtils.setField(jwtService, "accessTokenExpiration", -1000L);
+        String token = jwtService.generateAccessToken("user-expired", "x@y.com", "USER");
+        assertThat(jwtService.isTokenValid(token)).isFalse();
     }
 
     @Test
-    @Order(5)
-    @DisplayName("POST /register — should return 400 for invalid input")
-    void register_ValidationError() throws Exception {
-        RegisterRequest request = new RegisterRequest(
-            "not-an-email", "short", "", "INVALID_ROLE"
-        );
+    @DisplayName("isTokenValid - should return false for tampered token")
+    void isTokenValid_WithTamperedToken_ReturnsFalse() {
+        String token = jwtService.generateAccessToken("user-123", "john@example.com", "USER");
+        String tampered = token.substring(0, token.length() - 5) + "XXXXX";
+        assertThat(jwtService.isTokenValid(tampered)).isFalse();
+    }
 
-        mockMvc.perform(post("/v1/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
-            .andExpect(jsonPath("$.fieldErrors.email").exists())
-            .andExpect(jsonPath("$.fieldErrors.password").exists());
+    @Test
+    @DisplayName("extractClaims - should contain email and role")
+    void extractClaims_ContainsCustomClaims() {
+        String token = jwtService.generateAccessToken("user-claims", "test@x.com", "MERCHANT");
+        var claims = jwtService.extractClaims(token);
+        assertThat(claims.getSubject()).isEqualTo("user-claims");
+        assertThat(claims.get("email", String.class)).isEqualTo("test@x.com");
+        assertThat(claims.get("role", String.class)).isEqualTo("MERCHANT");
     }
 }
 ```
 
 ---
 
-## 7. curl Examples
+## 9. Controller Tests: AuthControllerTest
+
+**File:** `backend/identity-service/src/test/java/com/payflow/identity/controller/AuthControllerTest.java`
+
+### What It Tests
+HTTP behavior — correct status codes, JSON structure, and validation errors. Uses `@WebMvcTest` which starts ONLY the web layer (no database, no service logic).
+
+```java
+@WebMvcTest(AuthController.class)   // Only loads controller + Spring MVC
+@DisplayName("AuthController Integration Tests")
+class AuthControllerTest {
+
+    @Autowired private MockMvc mockMvc;      // Simulates HTTP requests
+    @MockBean private AuthService authService; // Fake service (injected into controller)
+    @Autowired private ObjectMapper objectMapper; // JSON serializer
+
+    @Test
+    @DisplayName("POST /v1/auth/register - should return 201 Created on success")
+    void register_ReturnsCreated() throws Exception {
+        // GIVEN: AuthService returns a successful response
+        AuthResponse mockResponse = AuthResponse.builder()
+                .accessToken("jwt-access-token")
+                .refreshToken("refresh-token-uuid")
+                .expiresIn(3600L)
+                .user(UserProfileResponse.builder()
+                        .id("user-123").email("john@example.com")
+                        .fullName("John Doe").role("USER").build())
+                .build();
+        when(authService.register(any(RegisterRequest.class))).thenReturn(mockResponse);
+
+        // WHEN: We send a valid registration request
+        RegisterRequest request = RegisterRequest.builder()
+                .email("john@example.com").password("password123").fullName("John Doe").build();
+
+        mockMvc.perform(post("/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                // THEN: HTTP 201 with correct JSON structure
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.accessToken").value("jwt-access-token"))
+                .andExpect(jsonPath("$.data.refreshToken").value("refresh-token-uuid"))
+                .andExpect(jsonPath("$.data.user.email").value("john@example.com"));
+    }
+
+    @Test
+    @DisplayName("POST /v1/auth/register - should return 400 for missing email")
+    void register_MissingEmail_ReturnsBadRequest() throws Exception {
+        // WHEN: Email is missing from request
+        RegisterRequest request = RegisterRequest.builder()
+                .password("password123").fullName("John Doe").build();
+
+        mockMvc.perform(post("/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                // THEN: 400 Bad Request (validation failed)
+                .andExpect(status().isBadRequest());
+        // AuthService is NEVER called (validation fails before it reaches the service)
+    }
+
+    @Test
+    @DisplayName("POST /v1/auth/register - should return 400 for invalid email format")
+    void register_InvalidEmail_ReturnsBadRequest() throws Exception {
+        RegisterRequest request = RegisterRequest.builder()
+                .email("not-an-email").password("password123").fullName("John Doe").build();
+
+        mockMvc.perform(post("/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+}
+```
+
+### MockMvc Explained
+
+| MockMvc method | What it does |
+|---------------|-------------|
+| `mockMvc.perform(post("/v1/auth/register"))` | Simulates sending POST request |
+| `.contentType(MediaType.APPLICATION_JSON)` | Sets Content-Type header |
+| `.content(json)` | Sets request body |
+| `.andExpect(status().isCreated())` | Asserts HTTP 201 response |
+| `.andExpect(jsonPath("$.data.accessToken").value("x"))` | Asserts JSON field value |
+
+---
+
+## 10. Testing with curl
+
+### Prerequisites
+- Identity Service running on port 8081
+- PostgreSQL running with `payflow_identity` database
 
 ### Register a New User
 
 ```bash
-curl -X POST http://localhost:8080/v1/auth/register \
+curl -s -X POST http://localhost:8081/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "merchant@payflow.com",
+    "fullName": "Tejaswi Kumar",
+    "email": "tejaswi@payflow.com",
     "password": "S3cur3P@ss!",
-    "fullName": "Rajesh Kumar",
     "role": "MERCHANT"
-  }'
+  }' | jq
 ```
 
-**Response (201 Created):**
+**Expected Response (201 Created):**
 ```json
 {
-  "accessToken": "eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI1YTZiN...",
-  "refreshToken": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-  "userId": "5a6b7c8d-9e0f-1a2b-3c4d-5e6f7a8b9c0d",
-  "tokenType": "Bearer",
-  "expiresIn": 900
+  "success": true,
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhYmMxMjMuLi4...",
+    "refreshToken": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "expiresIn": 900,
+    "user": {
+      "id": "5a6b7c8d-9e0f-1a2b-3c4d-5e6f7a8b9c0d",
+      "email": "tejaswi@payflow.com",
+      "fullName": "Tejaswi Kumar",
+      "role": "MERCHANT",
+      "createdAt": "2024-01-15T10:30:00Z"
+    }
+  }
 }
 ```
 
 ### Login
 
 ```bash
-curl -X POST http://localhost:8080/v1/auth/login \
+curl -s -X POST http://localhost:8081/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "merchant@payflow.com",
+    "email": "tejaswi@payflow.com",
     "password": "S3cur3P@ss!"
-  }'
+  }' | jq
 ```
 
-**Response (200 OK):**
-```json
-{
-  "accessToken": "eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI1YTZiN...",
-  "refreshToken": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "userId": "5a6b7c8d-9e0f-1a2b-3c4d-5e6f7a8b9c0d",
-  "tokenType": "Bearer",
-  "expiresIn": 900
-}
-```
-
-### Refresh Token
+### Refresh Token (use refreshToken from login response)
 
 ```bash
-curl -X POST http://localhost:8080/v1/auth/refresh \
+curl -s -X POST http://localhost:8081/v1/auth/refresh \
   -H "Content-Type: application/json" \
   -d '{
-    "refreshToken": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-  }'
+    "refreshToken": "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+  }' | jq
 ```
 
-### Get Profile
+### Get Profile (use X-User-Id from response)
 
 ```bash
-curl -X GET http://localhost:8080/v1/auth/profile \
-  -H "Authorization: Bearer eyJhbGciOiJIUzM4NCJ9..." \
-  -H "X-User-Id: 5a6b7c8d-9e0f-1a2b-3c4d-5e6f7a8b9c0d"
+curl -s -X GET http://localhost:8081/v1/auth/profile \
+  -H "X-User-Id: 5a6b7c8d-9e0f-1a2b-3c4d-5e6f7a8b9c0d" | jq
 ```
 
-**Response (200 OK):**
+### Test Validation Errors
+
+```bash
+curl -s -X POST http://localhost:8081/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fullName": "",
+    "email": "not-an-email",
+    "password": "short"
+  }' | jq
+```
+
+**Expected (400 Bad Request):**
 ```json
 {
-  "id": "5a6b7c8d-9e0f-1a2b-3c4d-5e6f7a8b9c0d",
-  "email": "merchant@payflow.com",
-  "fullName": "Rajesh Kumar",
-  "role": "MERCHANT",
-  "createdAt": "2024-01-15T10:30:00"
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Request validation failed",
+    "details": [
+      { "field": "fullName", "message": "Full name is required" },
+      { "field": "email", "message": "Invalid email format" },
+      { "field": "password", "message": "Password must be 8-100 characters" }
+    ]
+  }
 }
+```
+
+### Test Duplicate Email
+
+```bash
+# Register same email twice:
+curl -s -X POST http://localhost:8081/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"fullName":"Test","email":"dup@test.com","password":"Pass12345"}' | jq
+
+curl -s -X POST http://localhost:8081/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"fullName":"Test2","email":"dup@test.com","password":"Pass12345"}' | jq
+# Second one returns 409 Conflict
 ```
 
 ---
 
-## 8. Error Response Format
+## 11. Error Response Format
 
-All errors follow a consistent JSON structure:
+All errors follow a consistent structure from `common-lib`:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                   ERROR RESPONSE MAPPING                         │
-├──────────────────────────┬──────────┬───────────────────────────┤
-│ Exception                │ HTTP     │ Error Code                │
-├──────────────────────────┼──────────┼───────────────────────────┤
-│ DuplicateEmailException  │ 409      │ DUPLICATE_EMAIL           │
-│ InvalidCredentialsExc.   │ 401      │ INVALID_CREDENTIALS       │
-│ InvalidTokenException    │ 401      │ INVALID_TOKEN             │
-│ MethodArgumentNotValid   │ 400      │ VALIDATION_FAILED         │
-│ Exception (catch-all)    │ 500      │ INTERNAL_ERROR            │
-├──────────────────────────┼──────────┼───────────────────────────┤
-│                                                                 │
-│ Standard Error Body:                                            │
-│ {                                                               │
-│   "status": 401,                                                │
-│   "code": "INVALID_CREDENTIALS",                                │
-│   "message": "Invalid email or password",                       │
-│   "timestamp": "2024-01-15T10:30:00"                           │
-│ }                                                               │
-│                                                                 │
-│ Validation Error Body (400):                                    │
-│ {                                                               │
-│   "status": 400,                                                │
-│   "code": "VALIDATION_FAILED",                                  │
-│   "message": "Request validation failed",                       │
-│   "fieldErrors": {                                              │
-│     "email": "Must be a valid email address",                   │
-│     "password": "Password must be between 8 and 64 characters"  │
-│   },                                                            │
-│   "timestamp": "2024-01-15T10:30:00"                           │
-│ }                                                               │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                    ERROR RESPONSE MAPPING                         │
+├──────────────────────────────────┬──────┬────────────────────────┤
+│ Scenario                         │ HTTP │ Error Code             │
+├──────────────────────────────────┼──────┼────────────────────────┤
+│ Email already registered         │ 409  │ DUPLICATE_RESOURCE     │
+│ Wrong email or password          │ 401  │ UNAUTHORIZED           │
+│ Invalid/expired refresh token    │ 401  │ UNAUTHORIZED           │
+│ @Valid validation failed         │ 400  │ VALIDATION_ERROR       │
+│ User ID not found (profile)      │ 404  │ NOT_FOUND              │
+│ Unexpected bug                   │ 500  │ INTERNAL_ERROR         │
+├──────────────────────────────────┴──────┴────────────────────────┤
+│                                                                  │
+│  Success format:                                                 │
+│  { "success": true, "data": { ... } }                           │
+│                                                                  │
+│  Error format:                                                   │
+│  { "success": false, "error": { "code": "...", "message": "..." } }  │
+│                                                                  │
+│  Validation error format (includes field-level details):         │
+│  {                                                               │
+│    "success": false,                                             │
+│    "error": {                                                    │
+│      "code": "VALIDATION_ERROR",                                 │
+│      "message": "Request validation failed",                     │
+│      "details": [                                                │
+│        { "field": "email", "message": "Invalid email format" }   │
+│      ]                                                           │
+│    }                                                             │
+│  }                                                               │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## 12. How to Run & Verify
+
+### Run All Identity Service Tests
+
+```bash
+cd backend/identity-service
+mvn test
+```
+
+**Expected output:**
+```
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0  -- JwtServiceTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0  -- AuthServiceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0  -- AuthControllerTest
+[INFO] BUILD SUCCESS
+```
+
+### Run Only Specific Tests
+
+```bash
+# Just JWT tests
+mvn test -Dtest=JwtServiceTest
+
+# Just AuthService tests
+mvn test -Dtest=AuthServiceTest
+
+# Just Controller tests
+mvn test -Dtest=AuthControllerTest
+```
+
+### Run the Service and Test with curl
+
+```bash
+# 1. Make sure PostgreSQL is running with payflow_identity database
+# 2. Build common-lib first (if not done)
+cd backend && mvn install -pl common-lib -am -DskipTests
+
+# 3. Start Identity Service
+cd identity-service && mvn spring-boot:run
+
+# 4. In another terminal, test endpoints
+curl -s -X POST http://localhost:8081/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"fullName":"Test User","email":"test@example.com","password":"Password1!"}' | jq
+```
+
+### Verify Swagger UI
+
+Open browser: http://localhost:8081/swagger-ui/index.html
+
+You should see all 4 endpoints documented with request/response schemas.
 
 ---
 
@@ -932,14 +1454,16 @@ All errors follow a consistent JSON structure:
 
 | # | Concept | Key Takeaway |
 |---|---------|--------------|
-| 1 | DTOs with validation | `@Valid` + Jakarta annotations reject bad input before service layer |
-| 2 | Controller design | Thin controllers delegate to services; return ResponseEntity |
-| 3 | @RestControllerAdvice | Centralized exception handling across all controllers |
-| 4 | Mockito unit tests | `@Mock` dependencies, verify behavior not implementation |
-| 5 | Testcontainers | Real PostgreSQL in tests — no H2 compatibility issues |
-| 6 | Integration tests | `@SpringBootTest` + `MockMvc` for full HTTP lifecycle |
-| 7 | Error consistency | Every error returns same structure: status, code, message |
-| 8 | Security in errors | Never reveal whether email exists (same error for all login failures) |
+| 1 | **DTOs with validation** | `@Valid` + Jakarta annotations reject bad input before service layer |
+| 2 | **Thin controllers** | Controllers only handle HTTP; all logic in service layer |
+| 3 | **@RestControllerAdvice** | Centralized exception handling — no try-catch in controllers |
+| 4 | **ApiResponse wrapper** | Consistent JSON structure: `{ "success": true/false, "data"/"error": ... }` |
+| 5 | **MapStruct** | Compile-time entity→DTO mapping; safer than manual conversion |
+| 6 | **Mockito unit tests** | Test business logic in isolation with fake dependencies |
+| 7 | **@WebMvcTest** | Test HTTP layer without starting full application |
+| 8 | **MockMvc** | Simulate HTTP requests in tests without a real server |
+| 9 | **Given-When-Then** | Test structure: setup, action, assertion |
+| 10 | **Security in errors** | Never reveal whether email exists (same message for all login failures) |
 
 ---
 
@@ -964,3 +1488,20 @@ In **[Phase 4 Part 7a](./phase4-part07a-merchant-entities.md)**, we will impleme
 3. WebhookConfig and FeeConfig entities
 4. Flyway migrations for all merchant tables
 5. Entity relationship diagram for the merchant domain
+
+---
+
+## ✅ Identity Service Checklist
+
+Before moving to the Merchant Service, verify:
+
+- [ ] All 4 migrations run successfully (check Flyway output on startup)
+- [ ] Register returns 201 with tokens
+- [ ] Login returns 200 with tokens
+- [ ] Duplicate email returns 409
+- [ ] Wrong password returns 401
+- [ ] Invalid input returns 400 with field errors
+- [ ] Refresh returns new token pair (old token becomes invalid)
+- [ ] Profile returns user info with valid X-User-Id
+- [ ] All unit tests pass (`mvn test`)
+- [ ] Swagger UI loads at /swagger-ui/index.html

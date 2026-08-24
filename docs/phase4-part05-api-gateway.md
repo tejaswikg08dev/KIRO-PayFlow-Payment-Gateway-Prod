@@ -182,51 +182,75 @@ public class ApiGatewayApplication {
 
 ## 5. Route Configuration
 
-Routes are defined in the Config Server's `api-gateway.yml`:
+Routes are defined **programmatically** in Java using the `RouteLocatorBuilder` API. This gives us type safety and IDE support for route definitions.
 
-```yaml
-spring:
-  cloud:
-    gateway:
-      default-filters:
-        - DedupeResponseHeader=Access-Control-Allow-Origin  # Prevent duplicate CORS headers
-      routes:
-        # Identity Service — authentication endpoints
-        - id: identity-service
-          uri: lb://identity-service        # Load-balanced via Eureka
-          predicates:
-            - Path=/v1/auth/**              # All auth routes
+**File:** `backend/api-gateway/src/main/java/com/payflow/gateway/config/GatewayRoutesConfig.java`
 
-        # Merchant Service — merchant management
-        - id: merchant-service
-          uri: lb://merchant-service
-          predicates:
-            - Path=/v1/merchants/**
+```java
+package com.payflow.gateway.config;
 
-        # Payment Service — orders
-        - id: payment-service-orders
-          uri: lb://payment-service
-          predicates:
-            - Path=/v1/orders/**
+import org.springframework.cloud.gateway.route.RouteLocator;
+import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
-        # Payment Service — payments
-        - id: payment-service-payments
-          uri: lb://payment-service
-          predicates:
-            - Path=/v1/payments/**
+/**
+ * Programmatic route definitions for the API Gateway.
+ * Routes requests to appropriate microservices via Eureka service discovery.
+ * 
+ * WHY JAVA INSTEAD OF YAML?
+ * - Type-safe: Compiler catches typos in route names
+ * - IDE support: Auto-complete for builder methods
+ * - Conditional logic: Can add routes based on feature flags
+ * - Testable: Can unit test route configuration
+ * 
+ * HOW lb:// WORKS:
+ * "lb://identity-service" means:
+ * 1. Look up "identity-service" in Eureka registry
+ * 2. Get all registered instances (IPs + ports)
+ * 3. Load-balance across them (round-robin by default)
+ */
+@Configuration
+public class GatewayRoutesConfig {
 
-        # Payment Service — refunds
-        - id: payment-service-refunds
-          uri: lb://payment-service
-          predicates:
-            - Path=/v1/refunds/**
+    @Bean
+    public RouteLocator customRouteLocator(RouteLocatorBuilder builder) {
+        return builder.routes()
+                // Authentication endpoints → Identity Service
+                .route("identity-service", r -> r
+                        .path("/v1/auth/**")
+                        .uri("lb://identity-service"))
 
-        # Settlement Service
-        - id: settlement-service
-          uri: lb://settlement-service
-          predicates:
-            - Path=/v1/settlements/**
+                // Merchant management → Merchant Service
+                .route("merchant-service", r -> r
+                        .path("/v1/merchants/**")
+                        .uri("lb://merchant-service"))
+
+                // Order creation/management → Payment Service
+                .route("payment-orders", r -> r
+                        .path("/v1/orders/**")
+                        .uri("lb://payment-service"))
+
+                // Payment processing → Payment Service
+                .route("payment-payments", r -> r
+                        .path("/v1/payments/**")
+                        .uri("lb://payment-service"))
+
+                // Refund processing → Payment Service
+                .route("payment-refunds", r -> r
+                        .path("/v1/refunds/**")
+                        .uri("lb://payment-service"))
+
+                // Settlement reports → Settlement Service
+                .route("settlement-service", r -> r
+                        .path("/v1/settlements/**")
+                        .uri("lb://settlement-service"))
+                .build();
+    }
+}
 ```
+
+**Note:** You can also define routes in YAML (in Config Server's `api-gateway.yml`), but we chose the Java approach for type safety. Both approaches work identically at runtime.
 
 ### Route Resolution
 
@@ -761,6 +785,12 @@ rate-limiter:
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
         </dependency>
+
+        <!-- Actuator for health endpoints -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
@@ -911,6 +941,78 @@ Complete flow for `POST /v1/orders` (authenticated merchant creating an order):
 
 ## 14. Error Handling
 
+### GatewayExceptionHandler
+
+**File:** `backend/api-gateway/src/main/java/com/payflow/gateway/exception/GatewayExceptionHandler.java`
+
+The gateway has a custom reactive error handler that formats all errors into consistent JSON:
+
+```java
+package com.payflow.gateway.exception;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.boot.web.reactive.error.ErrorWebExceptionHandler;
+import org.springframework.core.annotation.Order;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Component;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Mono;
+
+import java.time.Instant;
+import java.util.Map;
+
+/**
+ * Global exception handler for the reactive gateway.
+ * Formats all errors into consistent JSON structure.
+ * 
+ * WHY ErrorWebExceptionHandler (not @RestControllerAdvice)?
+ * → Spring Cloud Gateway is WebFlux-based (reactive)
+ * → @RestControllerAdvice doesn't work with reactive error handling
+ * → ErrorWebExceptionHandler is the WebFlux equivalent
+ */
+@Component
+@Order(-1)  // Execute before Spring's default error handler
+public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Override
+    public Mono<Void> handle(ServerWebExchange exchange, Throwable ex) {
+        HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
+
+        // Extract status from ResponseStatusException (e.g., 404, 503)
+        if (ex instanceof org.springframework.web.server.ResponseStatusException rse) {
+            status = HttpStatus.valueOf(rse.getStatusCode().value());
+        }
+
+        exchange.getResponse().setStatusCode(status);
+        exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
+
+        // Consistent error format matching all other services
+        Map<String, Object> errorBody = Map.of(
+                "success", false,
+                "error", Map.of(
+                        "code", status.name(),
+                        "message", ex.getMessage() != null ? ex.getMessage() : "An unexpected error occurred"
+                ),
+                "timestamp", Instant.now().toString(),
+                "path", exchange.getRequest().getURI().getPath()
+        );
+
+        try {
+            byte[] bytes = objectMapper.writeValueAsBytes(errorBody);
+            DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(bytes);
+            return exchange.getResponse().writeWith(Mono.just(buffer));
+        } catch (JsonProcessingException e) {
+            return exchange.getResponse().setComplete();
+        }
+    }
+}
+```
+
 The gateway handles errors at the filter level:
 
 | Error | Source | Response |
@@ -921,18 +1023,34 @@ The gateway handles errors at the filter level:
 | Route not found | Gateway | 404 Not Found |
 | Downstream timeout | Gateway | 504 Gateway Timeout |
 
-### Gateway Exception Handler
+### Swagger Configuration
+
+**File:** `backend/api-gateway/src/main/java/com/payflow/gateway/config/SwaggerConfig.java`
 
 ```java
-// GatewayExceptionHandler provides structured error responses
-// for gateway-level errors (not downstream service errors)
-{
-  "success": false,
-  "error": {
-    "code": "GATEWAY_ERROR",
-    "message": "Service temporarily unavailable"
-  },
-  "timestamp": "2024-01-15T10:30:00Z"
+package com.payflow.gateway.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+
+/**
+ * Aggregated Swagger/OpenAPI configuration.
+ * Provides a single Swagger UI at the gateway for all services.
+ * Access at: http://localhost:8080/swagger-ui/index.html
+ */
+@Configuration
+public class SwaggerConfig {
+
+    @Bean
+    public OpenAPI gatewayOpenAPI() {
+        return new OpenAPI()
+                .info(new Info()
+                        .title("PayFlow Payment Gateway API")
+                        .version("1.0.0")
+                        .description("Unified API documentation for all PayFlow microservices"));
+    }
 }
 ```
 

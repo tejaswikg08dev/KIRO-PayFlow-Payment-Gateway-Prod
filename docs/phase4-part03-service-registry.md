@@ -232,10 +232,15 @@ eureka:
     <description>Eureka Server for service discovery</description>
 
     <dependencies>
-        <!-- Eureka Server — single dependency provides everything -->
+        <!-- Eureka Server — provides the full registry (REST API, dashboard, replication) -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-netflix-eureka-server</artifactId>
+        </dependency>
+        <!-- Actuator — provides /actuator/health for Docker HEALTHCHECK -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
     </dependencies>
 
@@ -250,7 +255,7 @@ eureka:
 </project>
 ```
 
-**Note:** Only ONE dependency is needed — `spring-cloud-starter-netflix-eureka-server`. It pulls in everything: Jersey for the REST API, the dashboard UI, replication logic, and health management.
+**Note:** Two dependencies — `eureka-server` provides the full registry (Jersey REST API, dashboard UI, replication logic), and `actuator` provides the `/actuator/health` endpoint for Docker health checks.
 
 ---
 
