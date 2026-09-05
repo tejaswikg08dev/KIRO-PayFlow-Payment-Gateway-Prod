@@ -10,12 +10,12 @@
 |-------|-------|
 | **Project** | PayFlow Payment Gateway |
 | **Phase** | 4 — Implementation |
-| **Part** | 6 (split into 6a, 6b, 6c) |
+| **Part** | 6 (split into 6a through 6e) |
 | **Module** | `identity-service` |
 | **Package** | `com.payflow.identity` |
 | **Port** | 8081 |
 | **Previous** | [Phase 4 Part 5: API Gateway](./phase4-part05-api-gateway.md) |
-| **Next** | [Phase 4 Part 7a: Merchant Service — Entities](./phase4-part07a-merchant-entities.md) |
+| **Next** | [Phase 4 Part 7 — Merchant Service Overview](./phase4-part07-merchant-service-overview.md) |
 | **Database** | PostgreSQL — `payflow_identity` |
 
 ---
@@ -350,6 +350,8 @@ After completing all three parts (6a + 6b + 6c), verify:
 | [Part 6a](./phase4-part06a-identity-entities.md) | Entities & Migrations (Data Layer) |
 | [Part 6b](./phase4-part06b-identity-jwt-auth.md) | JWT & Authentication (Service Layer) |
 | [Part 6c](./phase4-part06c-identity-controller-tests.md) | Controller, DTOs & Tests (HTTP Layer) |
+| [Part 6d](./phase4-part06d-identity-dockerfile-postgres.md) | Dockerfile, PostgreSQL & Prerequisites |
+| [Part 6e](./phase4-part06e-identity-connections-and-flows.md) | How Everything Connects (Flows & Big Picture) |
 
 ---
 
