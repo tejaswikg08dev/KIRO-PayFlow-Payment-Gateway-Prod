@@ -412,7 +412,7 @@ Creating `SecureRandom` is expensive (gathers entropy from OS). Create once, reu
 | Class | Algorithm | Security | Speed |
 |---|---|---|---|
 | `java.util.Random` | Linear congruential | ❌ PREDICTABLE — attacker can guess next value | Fast |
-| `java.security.SecureRandom` | OS entropy (/dev/urandom) | ✅ UNPREDICTABLE | Slightly slower |
+| `java.security.SecureRandom` | OS entropy (CryptGenRandom on Windows, /dev/urandom on Linux) | ✅ UNPREDICTABLE | Slightly slower |
 
 For security tokens (API keys, secrets), ALWAYS use `SecureRandom`. `Random` is only for non-security purposes (games, shuffling).
 
