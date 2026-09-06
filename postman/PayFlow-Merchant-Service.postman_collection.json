@@ -1,0 +1,254 @@
+{
+  "info": {
+    "name": "PayFlow - Merchant Service",
+    "description": "Merchant onboarding, API key management, webhook configuration\n\nBase URL: http://localhost:8082",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8082", "type": "string" },
+    { "key": "merchantId", "value": "", "type": "string" },
+    { "key": "apiKeyRaw", "value": "", "type": "string" },
+    { "key": "apiKeyId", "value": "", "type": "string" },
+    { "key": "webhookConfigId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Merchant CRUD",
+      "item": [
+        {
+          "name": "1. Register Merchant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  var json = pm.response.json();",
+                  "  pm.collectionVariables.set('merchantId', json.data.id);",
+                  "  pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "  pm.test('Has merchant ID', () => pm.expect(json.data.id).to.not.be.empty);",
+                  "  pm.test('Active is true', () => pm.expect(json.data.active).to.eql(true));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Rajesh Electronics\",\n  \"email\": \"billing@rajesh-electronics.com\",\n  \"businessType\": \"RETAIL\",\n  \"mdrRate\": 2.0\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/merchants", "host": ["{{baseUrl}}"], "path": ["v1", "merchants"] }
+          }
+        },
+        {
+          "name": "2. Register — Duplicate Email (409)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 409', () => pm.response.to.have.status(409));"], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Duplicate Shop\",\n  \"email\": \"billing@rajesh-electronics.com\",\n  \"businessType\": \"RETAIL\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/merchants", "host": ["{{baseUrl}}"], "path": ["v1", "merchants"] }
+          }
+        },
+        {
+          "name": "3. Get Merchant by ID",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"], "type": "text/javascript" } }],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/v1/merchants/{{merchantId}}", "host": ["{{baseUrl}}"], "path": ["v1", "merchants", "{{merchantId}}"] }
+          }
+        },
+        {
+          "name": "4. List All Merchants",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/v1/merchants", "host": ["{{baseUrl}}"], "path": ["v1", "merchants"] }
+          }
+        },
+        {
+          "name": "5. Update Merchant",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Rajesh Electronics (Updated)\",\n  \"email\": \"billing@rajesh-electronics.com\",\n  \"businessType\": \"E_COMMERCE\",\n  \"mdrRate\": 2.5\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/merchants/{{merchantId}}", "host": ["{{baseUrl}}"], "path": ["v1", "merchants", "{{merchantId}}"] }
+          }
+        },
+        {
+          "name": "6. Deactivate Merchant (Soft Delete)",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/v1/merchants/{{merchantId}}", "host": ["{{baseUrl}}"], "path": ["v1", "merchants", "{{merchantId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "API Key Management",
+      "item": [
+        {
+          "name": "7. Generate API Key ⚠️ SAVE rawKey!",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  var json = pm.response.json();",
+                  "  pm.collectionVariables.set('apiKeyRaw', json.data.rawKey);",
+                  "  pm.collectionVariables.set('apiKeyId', json.data.id);",
+                  "  pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "  pm.test('rawKey starts with pk_', () => pm.expect(json.data.rawKey).to.match(/^pk_/));",
+                  "  pm.test('Has prefix', () => pm.expect(json.data.prefix).to.not.be.empty);",
+                  "  console.log('⚠️ RAW KEY (save this!): ' + json.data.rawKey);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/v1/merchants/{{merchantId}}/api-keys", "host": ["{{baseUrl}}"], "path": ["v1", "merchants", "{{merchantId}}", "api-keys"] }
+          }
+        },
+        {
+          "name": "8. List API Keys (rawKey=null)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "var json = pm.response.json();",
+                  "if (json.data && json.data.length > 0) {",
+                  "  pm.test('rawKey is null in listing', () => pm.expect(json.data[0].rawKey).to.be.null);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/v1/merchants/{{merchantId}}/api-keys", "host": ["{{baseUrl}}"], "path": ["v1", "merchants", "{{merchantId}}", "api-keys"] }
+          }
+        },
+        {
+          "name": "9. Validate API Key",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns merchantId', () => {",
+                  "  var json = pm.response.json();",
+                  "  pm.expect(json.data).to.not.be.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/v1/merchants/api-keys/validate?key={{apiKeyRaw}}", "host": ["{{baseUrl}}"], "path": ["v1", "merchants", "api-keys", "validate"], "query": [{ "key": "key", "value": "{{apiKeyRaw}}" }] }
+          }
+        },
+        {
+          "name": "10. Revoke API Key",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/v1/merchants/{{merchantId}}/api-keys/{{apiKeyId}}", "host": ["{{baseUrl}}"], "path": ["v1", "merchants", "{{merchantId}}", "api-keys", "{{apiKeyId}}"] }
+          }
+        },
+        {
+          "name": "11. Validate Revoked Key (should fail)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 404 (revoked)', () => pm.response.to.have.status(404));"], "type": "text/javascript" } }],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/v1/merchants/api-keys/validate?key={{apiKeyRaw}}", "host": ["{{baseUrl}}"], "path": ["v1", "merchants", "api-keys", "validate"], "query": [{ "key": "key", "value": "{{apiKeyRaw}}" }] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Webhook Configuration",
+      "item": [
+        {
+          "name": "12. Create Webhook",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  var json = pm.response.json();",
+                  "  pm.collectionVariables.set('webhookConfigId', json.data.id);",
+                  "  pm.test('Has whsec_ secret', () => pm.expect(json.data.secret).to.match(/^whsec_/));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://rajesh-electronics.com/payflow-webhook\",\n  \"events\": [\"payment.authorized\", \"payment.captured\", \"payment.refunded\"]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/merchants/{{merchantId}}/webhooks", "host": ["{{baseUrl}}"], "path": ["v1", "merchants", "{{merchantId}}", "webhooks"] }
+          }
+        },
+        {
+          "name": "13. List Webhooks",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/v1/merchants/{{merchantId}}/webhooks", "host": ["{{baseUrl}}"], "path": ["v1", "merchants", "{{merchantId}}", "webhooks"] }
+          }
+        },
+        {
+          "name": "14. Update Webhook",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://rajesh-electronics.com/payflow-webhook-v2\",\n  \"events\": [\"payment.captured\", \"payment.refunded\"]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/merchants/{{merchantId}}/webhooks/{{webhookConfigId}}", "host": ["{{baseUrl}}"], "path": ["v1", "merchants", "{{merchantId}}", "webhooks", "{{webhookConfigId}}"] }
+          }
+        },
+        {
+          "name": "15. Deactivate Webhook",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/v1/merchants/{{merchantId}}/webhooks/{{webhookConfigId}}", "host": ["{{baseUrl}}"], "path": ["v1", "merchants", "{{merchantId}}", "webhooks", "{{webhookConfigId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "Health",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/actuator/health", "host": ["{{baseUrl}}"], "path": ["actuator", "health"] } }
+        }
+      ]
+    }
+  ]
+}

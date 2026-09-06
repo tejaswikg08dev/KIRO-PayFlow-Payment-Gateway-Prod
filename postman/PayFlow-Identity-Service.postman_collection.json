@@ -1,0 +1,221 @@
+{
+  "info": {
+    "name": "PayFlow - Identity Service",
+    "description": "Authentication & Authorization — Register, Login, Refresh, Profile\n\nBase URL: http://localhost:8081 (direct) or http://localhost:8080 (via Gateway)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8081", "type": "string" },
+    { "key": "gatewayUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "accessToken", "value": "", "type": "string" },
+    { "key": "refreshToken", "value": "", "type": "string" },
+    { "key": "userId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. Register — MERCHANT",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "  var json = pm.response.json();",
+              "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
+              "  pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+              "  pm.collectionVariables.set('userId', json.data.user.id);",
+              "  pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+              "  pm.test('Has accessToken', () => pm.expect(json.data.accessToken).to.not.be.empty);",
+              "  pm.test('Has refreshToken', () => pm.expect(json.data.refreshToken).to.not.be.empty);",
+              "  pm.test('Has user profile', () => pm.expect(json.data.user.email).to.eql('merchant@payflow.com'));",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Rajesh Kumar\",\n  \"email\": \"merchant@payflow.com\",\n  \"password\": \"SecureP@ss123\",\n  \"role\": \"MERCHANT\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/v1/auth/register", "host": ["{{baseUrl}}"], "path": ["v1", "auth", "register"] }
+      }
+    },
+    {
+      "name": "2. Register — USER",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Tejaswi Customer\",\n  \"email\": \"customer@example.com\",\n  \"password\": \"CustP@ss456\",\n  \"role\": \"USER\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/v1/auth/register", "host": ["{{baseUrl}}"], "path": ["v1", "auth", "register"] }
+      }
+    },
+    {
+      "name": "3. Register — Duplicate Email (409)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 409 Conflict', () => pm.response.to.have.status(409));",
+              "pm.test('Error code DUPLICATE_RESOURCE', () => {",
+              "  var json = pm.response.json();",
+              "  pm.expect(json.success).to.eql(false);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Duplicate User\",\n  \"email\": \"merchant@payflow.com\",\n  \"password\": \"AnyP@ss789\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/v1/auth/register", "host": ["{{baseUrl}}"], "path": ["v1", "auth", "register"] }
+      }
+    },
+    {
+      "name": "4. Register — Validation Error (400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"\",\n  \"email\": \"not-an-email\",\n  \"password\": \"short\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/v1/auth/register", "host": ["{{baseUrl}}"], "path": ["v1", "auth", "register"] }
+      }
+    },
+    {
+      "name": "5. Login — Success",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "  var json = pm.response.json();",
+              "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
+              "  pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+              "  pm.collectionVariables.set('userId', json.data.user.id);",
+              "  pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+              "  pm.test('Has tokens', () => pm.expect(json.data.accessToken).to.not.be.empty);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"merchant@payflow.com\",\n  \"password\": \"SecureP@ss123\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/v1/auth/login", "host": ["{{baseUrl}}"], "path": ["v1", "auth", "login"] }
+      }
+    },
+    {
+      "name": "6. Login — Wrong Password (401)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 401 Unauthorized', () => pm.response.to.have.status(401));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"merchant@payflow.com\",\n  \"password\": \"WrongPassword\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/v1/auth/login", "host": ["{{baseUrl}}"], "path": ["v1", "auth", "login"] }
+      }
+    },
+    {
+      "name": "7. Refresh Token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "  var json = pm.response.json();",
+              "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
+              "  pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+              "  pm.test('New tokens received', () => pm.expect(json.data.accessToken).to.not.be.empty);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/v1/auth/refresh", "host": ["{{baseUrl}}"], "path": ["v1", "auth", "refresh"] }
+      }
+    },
+    {
+      "name": "8. Get Profile",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('Has user data', () => {",
+              "  var json = pm.response.json();",
+              "  pm.expect(json.data.email).to.eql('merchant@payflow.com');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-User-Id", "value": "{{userId}}" }],
+        "url": { "raw": "{{baseUrl}}/v1/auth/profile", "host": ["{{baseUrl}}"], "path": ["v1", "auth", "profile"] }
+      }
+    },
+    {
+      "name": "9. Health Check",
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{baseUrl}}/actuator/health", "host": ["{{baseUrl}}"], "path": ["actuator", "health"] }
+      }
+    }
+  ]
+}
