@@ -12,7 +12,7 @@
 | **Phase** | 4 — Implementation |
 | **Part** | 7h — Connections, Flows & Big Picture |
 | **Previous** | [Part 7g — Controller + Docker](./phase4-part07g-merchant-controller-docker.md) |
-| **Next** | [Phase 4 Part 8a — Payment Service Entities](./phase4-part08a-payment-entities.md) |
+| **Next** | [Phase 4 Part 8 — Payment Service Overview](./phase4-part08-payment-service-overview.md) |
 
 ---
 
@@ -816,4 +816,4 @@ Your project has `infra/docker/docker-compose.yml` that starts ALL infrastructur
 
 ---
 
-*Merchant Service is COMPLETE. Next: [Phase 4 Part 8a — Payment Service Entities](./phase4-part08a-payment-entities.md) →*
+*Merchant Service is COMPLETE. Next: [Phase 4 Part 8 — Payment Service Overview](./phase4-part08-payment-service-overview.md) →*

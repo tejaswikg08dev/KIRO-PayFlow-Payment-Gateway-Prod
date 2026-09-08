@@ -16,7 +16,7 @@
 | **Port** | 8082 |
 | **Database** | PostgreSQL — `payflow_merchant` |
 | **Previous** | [Phase 4 Part 6c: Identity Service — Controller & Tests](./phase4-part06c-identity-controller-tests.md) |
-| **Next** | [Phase 4 Part 8a: Payment Service — Entities](./phase4-part08a-payment-entities.md) |
+| **Next** | [Phase 4 Part 8: Payment Service Overview](./phase4-part08-payment-service-overview.md) |
 
 ---
 

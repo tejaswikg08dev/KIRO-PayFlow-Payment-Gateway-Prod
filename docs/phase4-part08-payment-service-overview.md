@@ -17,7 +17,7 @@
 | **Database** | PostgreSQL — `payflow_payment` |
 | **Also Uses** | Redis (idempotency), Kafka (events), Feign (inter-service calls) |
 | **Previous** | [Phase 4 Part 7h — Merchant Connections](./phase4-part07h-merchant-connections-and-flows.md) |
-| **Next** | [Phase 4 Part 9 — Settlement Service](./phase4-part09-settlement-service.md) |
+| **Next** | [Phase 4 Part 9 — Routing Service](./phase4-part09-routing-service-overview.md) |
 
 ---
 

@@ -13,7 +13,7 @@
 | **Part** | 7g — Controller + curl Testing + Dockerfile |
 | **What You Build** | MerchantController.java, Dockerfile, curl test commands |
 | **Previous** | [Part 7f — Services + Tests](./phase4-part07f-merchant-services-tests.md) |
-| **Next** | [Phase 4 Part 8a — Payment Service Entities](./phase4-part08a-payment-entities.md) |
+| **Next** | [Phase 4 Part 8 — Payment Service Overview](./phase4-part08-payment-service-overview.md) |
 
 ---
 
@@ -907,4 +907,4 @@ You've built the entire Merchant Service from scratch across 7 parts:
 
 ---
 
-*Next: [Phase 4 Part 8a — Payment Service Entities](./phase4-part08a-payment-entities.md) →*
+*Next: [Phase 4 Part 8 — Payment Service Overview](./phase4-part08-payment-service-overview.md) →*

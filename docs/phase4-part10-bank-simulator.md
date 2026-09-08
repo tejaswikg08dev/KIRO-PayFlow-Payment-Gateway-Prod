@@ -5,7 +5,7 @@
 | **Project** | PayFlow Payment Gateway |
 | **Phase** | 4 — Routing & Bank Integration |
 | **Part** | 10 — Bank Simulator (Fake Bank for Testing) |
-| **Previous** | [Part 9C — Fraud Detection & Smart Routing](./phase4-part09c-routing-fraud-smartrouting.md) |
+| **Previous** | [Part 9k — Routing Service Connections & Flows](./phase4-part09k-connections-flows.md) |
 | **Next** | [Part 11 — Settlement Service](./phase4-part11-settlement-service.md) |
 | **Time** | ~2.5 hours |
 | **Difficulty** | ★★★☆☆ (Intermediate) |
@@ -943,4 +943,4 @@ In **Part 11**, we'll build the **Settlement Service** — the end-of-day batch 
 
 ---
 
-[← Previous: Part 9C — Fraud & Smart Routing](./phase4-part09c-routing-fraud-smartrouting.md) | [Next: Part 11 — Settlement Service →](./phase4-part11-settlement-service.md)
+[← Previous: Part 9k — Routing Connections & Flows](./phase4-part09k-connections-flows.md) | [Next: Part 11 — Settlement Service →](./phase4-part11-settlement-service.md)

@@ -291,4 +291,4 @@ if ("00".equals(responseCode)) {
 
 ---
 
-*This document serves as a quick reference for the PayFlow ISO 8583 implementation. For implementation details, see [Phase 4 Part 9a](./phase4-part09a-routing-iso8583.md).*
+*This document serves as a quick reference for the PayFlow ISO 8583 implementation. For implementation details, see [Phase 4 Part 9b — ISO 8583 Foundation](./phase4-part09b-iso8583-foundation.md) and [Part 9c — ISO 8583 Messages](./phase4-part09c-iso8583-messages.md).*
